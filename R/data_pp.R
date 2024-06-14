@@ -5,7 +5,7 @@ library (readxl)
 # ***The functions here are dataset-specific***
 # ***When deploying a different dataset, variable names must be updated***
 
-bmtdata = read_excel('~/shinybmt/data/bmtdata.xlsx')
+bmtdata = read_excel(here::here('data/bmtdata.xlsx'))
 
 # surv_selection = c('Please select...' = '', 'OS', 'RFS', 'GRFS')
 # In this dataset
