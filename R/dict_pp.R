@@ -5,7 +5,7 @@ library (jsonlite)
 
 # pre-process data dictionary 
 
-dict = read_excel("~/shinybmt/data/dict.xlsx")
+dict = read_excel(here::here("data/dict.xlsx"))
 dict = dict %>%
   rename ('num' = '#') %>%
   rename ('variable' = 'Variable / Field Name') %>%
