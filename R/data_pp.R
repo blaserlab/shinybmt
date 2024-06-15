@@ -5,7 +5,10 @@ library (readxl)
 # ***The functions here are dataset-specific***
 # ***When deploying a different dataset, variable names must be updated***
 
-bmtdata = read_excel(here::here('data/bmtdata.xlsx'))
+get_bmtdata <- function(dir) {
+  bmtdata = read_excel(fs::path(dir, 'bmtdata.xlsx'))
+  
+}
 
 # surv_selection = c('Please select...' = '', 'OS', 'RFS', 'GRFS')
 # In this dataset
