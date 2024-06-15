@@ -1,19 +1,16 @@
-# usethis::proj_activate("/workspace/brad_workspace/shinybmt/")
-library (ggplot2)
-library (tidycmprsk)
-library (dplyr)
-library (tidyr)
-library (survminer)
-library (survival)
-library (gtsummary)
-library (gt)
-library (ggsurvfit)
-library (ggsci)
-library (readxl)
-library("shiny")
-
-
-shinyBMT <- function(data_dir, shiny_host = "10.221.152.46", shiny_port = 3274) {
+#' @import ggplot2
+#' @import tidycmprsk
+#' @import tidyr
+#' @import survminer
+#' @import survival
+#' @import gtsummary
+#' @import gt
+#' @import ggsurvfit
+#' @import ggsci
+#' @import readxl
+#' @import shiny
+#' @export
+shinyBMT <- function(data_dir, shiny_host = NULL, shiny_port = NULL) {
   options(shiny.host = shiny_host)
   options(shiny.port = shiny_port)
   options(shiny.launch.browser = FALSE)

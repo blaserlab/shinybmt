@@ -1,9 +1,8 @@
-library (dplyr)
-library (tidyr)
-library (gtsummary)
-
 
 # extract label and choices from dict based on 'inputID'
+#' @import dplyr
+#' @import tidyr
+#' @import gtsummary
 select_input_choices = function(inputId, dict) {
   filtered_dict = dict %>% filter(variable %in% inputId)
   input_choices = data.frame(
@@ -18,6 +17,9 @@ select_input_choices = function(inputId, dict) {
 
 # filter age based on a range, and doe (date of event), dob (date of birth)
 # create a new variable named 'new_age'
+#' @import dplyr
+#' @import tidyr
+#' @import gtsummary
 filter_age <- function (age_range, dob, doe, data) {
   # Safe conversion to Date format with handling NA or incorrect formats
   data$dob_date = tryCatch(as.Date(data[[dob]]), error = function(e) return(NA))
@@ -36,6 +38,9 @@ filter_age <- function (age_range, dob, doe, data) {
 
 # based on input selections (list_choice) to filter data and create Group 1 and 2
 # return filtered data, with a new variable "group" with names from "group_name"
+#' @import dplyr
+#' @import tidyr
+#' @import gtsummary
 filter_data = function(age_range_1, age_range_2, dob, doe,
                        list_choice_1, list_choice_2, inputId, 
                        group_name_1, group_name_2, data) {

@@ -28,7 +28,7 @@ blaseRtemplates::git_easy_branch(branch = "brad_working")
 # save, add and commit your work but don't push
 blaseRtemplates::write_project_library_catalog()
 gert::git_add("*")
-gert::git_commit("")
+gert::git_commit("converted to R package")
 
 # frequently update your working branch from main or master branch
 # this will first update main or master from remote

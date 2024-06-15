@@ -1,9 +1,7 @@
-library (dplyr)
-library (tidyr)
-library (readxl)
-library (jsonlite)
-
-
+#' @import dplyr
+#' @import tidyr
+#' @import readxl
+#' @import jsonlite
 get_dict <- function(dir) {
   # pre-process data dictionary
   
