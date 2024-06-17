@@ -1,15 +1,15 @@
-library (ggplot2)
-library (tidycmprsk)
-library (dplyr)
-library (tidyr)
-library (survminer)
-library (survival)
-library (gtsummary)
-library (ggsurvfit)
-library (ggsci)
 
 # survival function
 # surv_type = c('OS', 'PFS', 'GRFS')
+#' @import ggplot2
+#' @import tidycmprsk
+#' @import dplyr
+#' @import tidyr
+#' @import survminer
+#' @import survival
+#' @import gtsummary
+#' @import ggsurvfit
+#' @import ggsci
 surv_from_hct = function(subset_data, surv_status, surv_time, 
                          group_names, surv_type) {
   
@@ -56,6 +56,15 @@ surv_from_hct = function(subset_data, surv_status, surv_time,
 # cumulative incidence (ci) function
 # Fine-Gray competing risk model, treating death as a competing risk
 # ci_type = c('ANC engraftment', 'Plt engraftment', 'G2-4 aGvHD', 'G3-4 aGvHD')
+#' @import ggplot2
+#' @import tidycmprsk
+#' @import dplyr
+#' @import tidyr
+#' @import survminer
+#' @import survival
+#' @import gtsummary
+#' @import ggsurvfit
+#' @import ggsci
 ci_from_hct = function(subset_data, ci_status, ci_time, surv_status, surv_time,
                        group_names, ci_type) {
 

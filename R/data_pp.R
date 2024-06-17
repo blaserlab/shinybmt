@@ -1,11 +1,14 @@
-library (dplyr)
-library (tidyr)
-library (readxl)
 
 # ***The functions here are dataset-specific***
 # ***When deploying a different dataset, variable names must be updated***
 
-bmtdata = read_excel(here::here('data/bmtdata.xlsx'))
+#' @import dplyr
+#' @import tidyr
+#' @import readxl
+get_bmtdata <- function(dir) {
+  bmtdata = read_excel(fs::path(dir, 'bmtdata.xlsx'))
+  
+}
 
 # surv_selection = c('Please select...' = '', 'OS', 'RFS', 'GRFS')
 # In this dataset
@@ -23,6 +26,9 @@ bmtdata = read_excel(here::here('data/bmtdata.xlsx'))
 
 
 # Define the function to calculate GRFS status and GRFS time
+#' @import dplyr
+#' @import tidyr
+#' @import readxl
 calculate_grfs <- function(data) {
   data$grfs_status <- with(data, {
     # Initialize GRFS status to 0 (false)
@@ -52,6 +58,9 @@ calculate_grfs <- function(data) {
 }
 
 # a function to return the list of variables needed for surv_from_hct input
+#' @import dplyr
+#' @import tidyr
+#' @import readxl
 surv_param = function(surv_type, filtered_data) {
   
   # define variables from source dataset
@@ -112,6 +121,9 @@ surv_param = function(surv_type, filtered_data) {
 # 1388: ptp_agvhd_max_grade: max overall grade of acute GVHD
 # 1389: ptp_agvhd_max_grade_date: Date of maximum overall grade of acute GVHD
 
+#' @import dplyr
+#' @import tidyr
+#' @import readxl
 cum_param = function(ci_type, filtered_data) {
   
   # define variables from source dataset
