@@ -20,18 +20,55 @@ select_input_choices = function(inputId, dict) {
 #' @import dplyr
 #' @import tidyr
 #' @import gtsummary
-filter_age <- function (age_range, dob, doe, data) {
+filter_age = function (age_range, dob, doe, data) {
   # Safe conversion to Date format with handling NA or incorrect formats
-  data$dob_date = tryCatch(as.Date(data[[dob]]), error = function(e) return(NA))
-  data$doe_date = tryCatch(as.Date(data[[doe]]), error = function(e) return(NA))
+  data$dob_date = tryCatch(as.Date(data[[dob]]), error = function(e) return('Not date format'))
+  data$doe_date = tryCatch(as.Date(data[[doe]]), error = function(e) return('Not date format'))
   
   # Calculate age safely, considering potential NA values in date conversion
   data$new_age = ifelse(!is.na(data$dob_date) & !is.na(data$doe_date),
-                         as.integer((data$doe_date - data$dob_date) / 365.25),
-                         NA)
+                        as.integer((data$doe_date - data$dob_date) / 365.25),
+                        NA)
   # Filter data based on age range
   filtered_data = data[!is.na(data$new_age) & data$new_age >= age_range[1] & data$new_age <= age_range[2], ]
   return(filtered_data)
+}
+
+
+# for an age threshold k, create a new variable named "age_group_k", 
+# where age>=k dummy labeled as '>=k', age<k labeled as '<k'
+#' @import dplyr
+#' @import tidyr
+#' @import gtsummary
+filter_age_group = function (k, dob, doe, data) {
+  # Safe conversion to Date format with handling NA or incorrect formats
+  data$dob_date = tryCatch(as.Date(data[[dob]]), error = function(e) return('Not date format'))
+  data$doe_date = tryCatch(as.Date(data[[doe]]), error = function(e) return('Not date format'))
+  
+  # Calculate age safely, considering potential NA values in date conversion
+  data$age = ifelse(!is.na(data$dob_date) & !is.na(data$doe_date),
+                    as.integer((data$doe_date - data$dob_date) / 365.25),
+                    NA)
+  
+  # Create new variable for age group based on the threshold k
+  data[[paste("age_group", k, sep = "_")]] = ifelse(data$age >= k, paste('>=',k) , paste('<',k))
+  return(data)
+}
+
+# for a HCT-CI threshold k, create a new variable "hct_ci_k", where
+# HCT-CI>=k dummy labeled as '>=k', HCT-CI<k labeled as '<k'
+#' @import dplyr
+#' @import tidyr
+#' @import gtsummary
+filter_hci_group = function (k, data) {
+  # Check if 'hct_ci' column exists in the data
+  if (!"hct_ci" %in% colnames(data)) {
+    stop("Error: 'hct_ci' column not found in the data.")
+  }
+  # Create new variable "hct_ci_k"
+  data[[paste("hct_ci", k, sep = "_")]] = ifelse(is.na(data$hct_ci), NA,
+                                                 ifelse(data$hct_ci >= k, paste('>=',k), paste('<',k)))
+  return(data)
 }
 
 
@@ -67,10 +104,8 @@ filter_data = function(age_range_1, age_range_2, dob, doe,
   # Assign group labels by creating a new variable "group"
   filtered_group1$group = group_name_1
   filtered_group2$group = group_name_2
-
+  
   filtered_data = rbind(filtered_group1, filtered_group2)
   
   return(filtered_data)
 }
-
-

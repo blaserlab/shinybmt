@@ -26,6 +26,7 @@ get_bmtdata <- function(dir) {
 
 
 # Define the function to calculate GRFS status and GRFS time
+# Define the function to calculate GRFS status and GRFS time
 #' @import dplyr
 #' @import tidyr
 #' @import readxl
@@ -63,7 +64,7 @@ calculate_grfs <- function(data) {
 #' @import readxl
 surv_param = function(surv_type, filtered_data) {
   
-  # define variables from source dataset
+  # define and adds new variables from source dataset
   filtered_data$os_time = as.integer(as.Date(filtered_data$last_fu) - 
                                        as.Date(filtered_data$tp_hct_date))
   filtered_data$rfs_status = ifelse(filtered_data$pt_status==1 | filtered_data$tx_relapse==1,
@@ -82,7 +83,7 @@ surv_param = function(surv_type, filtered_data) {
       subset_data = filtered_data, 
       surv_status = 'pt_status', 
       surv_time = 'os_time', 
-      surv_type = surv_type, 
+      surv_type = 'surv_type', 
       group_names = 'group'
     )
   } else if (surv_type == 'RFS') {
@@ -90,7 +91,7 @@ surv_param = function(surv_type, filtered_data) {
       subset_data = filtered_data, 
       surv_status = 'rfs_status', 
       surv_time = 'rfs_time', 
-      surv_type = surv_type, 
+      surv_type = 'surv_type', 
       group_names = 'group'
     )
   } else if (surv_type == 'GRFS') {
@@ -98,7 +99,7 @@ surv_param = function(surv_type, filtered_data) {
       subset_data = filtered_data, 
       surv_status = 'grfs_status', 
       surv_time = 'grfs_time', 
-      surv_type = surv_type, 
+      surv_type = 'surv_type', 
       group_names = 'group'
     )
   }
@@ -120,7 +121,6 @@ surv_param = function(surv_type, filtered_data) {
 
 # 1388: ptp_agvhd_max_grade: max overall grade of acute GVHD
 # 1389: ptp_agvhd_max_grade_date: Date of maximum overall grade of acute GVHD
-
 #' @import dplyr
 #' @import tidyr
 #' @import readxl
@@ -152,7 +152,7 @@ cum_param = function(ci_type, filtered_data) {
       ci_time = 'anc_engraftment_time',
       surv_status = 'pt_status', 
       surv_time = 'os_time', 
-      ci_type = ci_type, 
+      ci_type = 'ci_type', 
       group_names = 'group'
     )
   } else if (ci_type == 'Plt engraftment') {
@@ -162,7 +162,7 @@ cum_param = function(ci_type, filtered_data) {
       ci_time = 'plt_engraftment_time',
       surv_status = 'pt_status', 
       surv_time = 'os_time', 
-      ci_type = ci_type, 
+      ci_type = 'ci_type', 
       group_names = 'group'
     )
   } else if (ci_type == 'G2-4 aGvHD') {
@@ -172,7 +172,7 @@ cum_param = function(ci_type, filtered_data) {
       ci_time = 'g2_4_gvhd_time',
       surv_status = 'pt_status', 
       surv_time = 'os_time', 
-      ci_type = ci_type, 
+      ci_type = 'ci_type', 
       group_names = 'group'
     )
   } else if (ci_type == 'G3-4 aGvHD') {
@@ -182,8 +182,46 @@ cum_param = function(ci_type, filtered_data) {
       ci_time = 'g3_4_gvhd_time',
       surv_status = 'pt_status', 
       surv_time = 'os_time', 
-      ci_type = ci_type, 
+      ci_type = 'ci_type', 
       group_names = 'group'
     )
   } 
+}
+
+
+# A dictionary of mapping variable name to variable labels in the dataset
+# work for a single element of a vector
+#' @import dplyr
+#' @import tidyr
+#' @import readxl
+map_variable_name = function(input) {
+  # Define the mapping between the inputs and the corresponding tbl_variable items
+  mapping = list(
+    'Age' = 'new_age',
+    'Sex' = 'pt_sex',
+    'Race' = 'pt_race',
+    'Diagnosis' = 'dx',
+    'Prep type' = 'tp_prep_class',
+    'Donor type' = 'tp_donor1_type',
+    'Disease status' = 'tx_dz_status',
+    'Age (>=65)' = 'age_group_65',
+    'HCT-CI (>=3)' = 'hct_ci_3',
+    'Group' = 'group'
+  )
+  
+  # Helper function to map individual elements
+  map_single_element = function(element) {
+    if (element %in% names(mapping)) {
+      return(mapping[[element]])
+    } else {
+      stop(paste("The mapping for the label '", element, "' does not exist", sep = ""))
+    }
+  }
+  
+  # Check if the input is a vector
+  if (is.vector(input)) {
+    return(sapply(input, map_single_element, USE.NAMES = FALSE))
+  } else {
+    return(map_single_element(input))
+  }
 }
