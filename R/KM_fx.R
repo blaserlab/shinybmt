@@ -1,6 +1,6 @@
 
 # survival function
-# surv_type = c('OS', 'PFS', 'GRFS')
+# surv_type = c('OS', 'PFS', 'GRFS', 'NRM', 'NRM_100')
 #' @import ggplot2
 #' @import tidycmprsk
 #' @import dplyr
@@ -28,27 +28,75 @@ surv_from_hct = function(subset_data, surv_status, surv_time,
   # remove annoying 'group=' prefix in legends: pay attention, this is name specific
   names(surv_model$strata) = gsub("group=", "", names(surv_model$strata))
   
-  # draw plot
-  surv_plot = ggsurvplot(surv_model, data=subset_data,
-                      title = sprintf("%s", surv_type),
-                      palette = "npg", censor = T,
-                      conf.int = T, conf.int.alpha = 0.2,
-                      ylim = c(0, 1), 
-                      xlim = c(0,max_time + 50),
-                      break.x.by = round(max_time / 100) * 10,
-                      xlab = "Time since transplant (days)",
-                      ylab = sprintf("%s probability", surv_type),
-                      legend = 'bottom',
-                      risk.table = T,
-                      risk.table.col = "strata",
-                      tables.theme = theme_void(),
-                      pval = T)
-  surv_plot$plot = surv_plot$plot + theme(legend.title=element_blank()) +
-    ggplot2::annotate("text", hjust = 0, x = 0, y = 0.1,
-                       label = sprintf("HR %.2f, 95%%CI %.2f to %.2f", 
-                                       surv_hr, surv_ci_lower, surv_ci_upper),
-                       size = 5)
-  return(surv_plot)
+  # draw CI plot for NRM, and survival plot for the rest
+  if (surv_type %in% c('OS', 'PFS', 'GRFS')) {
+    surv_plot = ggsurvplot(surv_model, data=subset_data,
+                           title = sprintf("%s", surv_type),
+                           palette = "npg", censor = T,
+                           conf.int = T, conf.int.alpha = 0.2,
+                           ylim = c(0, 1), 
+                           xlim = c(0,max_time + 50),
+                           break.x.by = round(max_time / 100) * 10,
+                           xlab = "Time since transplant (days)",
+                           ylab = sprintf("%s probability", surv_type),
+                           legend = 'bottom',
+                           risk.table = T,
+                           risk.table.col = "strata",
+                           tables.theme = theme_void(),
+                           pval = T)
+    surv_plot$plot = surv_plot$plot + theme(legend.title=element_blank()) +
+      ggplot2::annotate("text", hjust = 0, x = 0, y = 0.1,
+                        label = sprintf("HR %.2f, 95%%CI %.2f to %.2f", 
+                                        surv_hr, surv_ci_lower, surv_ci_upper),
+                        size = 5)
+    return(surv_plot)
+  } else if (surv_type =='NRM') {
+    surv_plot = ggsurvplot(surv_model, data=subset_data,
+                           title = sprintf("%s", surv_type),
+                           palette = "npg", censor = T,
+                           fun = "cumhaz",
+                           conf.int = T, conf.int.alpha = 0.2,
+                           ylim = c(0, 1), 
+                           xlim = c(0,max_time + 50),
+                           break.x.by = round(max_time / 100) * 10,
+                           xlab = "Time since transplant (days)",
+                           ylab = sprintf("%s probability", surv_type),
+                           legend = 'bottom',
+                           risk.table = T,
+                           risk.table.col = "strata",
+                           tables.theme = theme_void(),
+                           pval = T)
+    surv_plot$plot = surv_plot$plot + theme(legend.title=element_blank()) +
+      ggplot2::annotate("text", hjust = 0, x = 0, y = 0.1,
+                        label = sprintf("HR %.2f, 95%%CI %.2f to %.2f", 
+                                        surv_hr, surv_ci_lower, surv_ci_upper),
+                        size = 5)
+    return(surv_plot)
+  } else if (surv_type =='NRM_100') {
+    surv_plot = ggsurvplot(surv_model, data=subset_data,
+                           title = sprintf("%s", surv_type),
+                           palette = "npg", censor = T,
+                           fun = "cumhaz",
+                           conf.int = T, conf.int.alpha = 0.2,
+                           ylim = c(0, 1), 
+                           xlim = c(0,105),
+                           break.x.by = 20,
+                           xlab = "Time since transplant (days)",
+                           ylab = sprintf("%s probability", surv_type),
+                           legend = 'bottom',
+                           risk.table = T,
+                           risk.table.col = "strata",
+                           tables.theme = theme_void(),
+                           pval = T)
+    surv_plot$plot = surv_plot$plot + theme(legend.title=element_blank()) +
+      ggplot2::annotate("text", hjust = 0, x = 0, y = 0.1,
+                        label = sprintf("HR %.2f, 95%%CI %.2f to %.2f", 
+                                        surv_hr, surv_ci_lower, surv_ci_upper),
+                        size = 5)
+    return(surv_plot)
+  }
+  
+  
 }
 
 

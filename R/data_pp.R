@@ -10,7 +10,7 @@ get_bmtdata <- function(dir) {
   
 }
 
-# surv_selection = c('Please select...' = '', 'OS', 'RFS', 'GRFS')
+# surv_selection = c('Please select...' = '', 'OS', 'RFS', 'GRFS', 'NRM', 'NRM_100')
 # In this dataset
 # 20: pt_status: did the pt die, c(1,0)
 # 19: last_fu: data of last follow up or death, YYYY-MM-DD
@@ -77,6 +77,26 @@ surv_param = function(surv_type, filtered_data) {
   
   filtered_data = calculate_grfs(filtered_data)
   
+  filtered_data$nrm_status = ifelse(filtered_data$pt_status == 1 & 
+                                      filtered_data$tx_relapse == 0, 1, 0)
+  
+  
+  filtered_data$nrm_time = with(filtered_data, {
+    days_to_death = as.integer(as.Date(last_fu) - as.Date(tp_hct_date))
+    days_to_relapse = as.integer(as.Date(tx_relapse_date) - as.Date(tp_hct_date))
+    ifelse(nrm_status == 1, days_to_death, NA)
+  }) # if pt did not die or die d/t relapse, nrm time is set to NA
+  
+  filtered_data$nrm_100d_status = with(filtered_data, {
+    nrm_within_100d = pt_status == 1 & tx_relapse == 0 & os_time <= 100
+    ifelse(nrm_within_100d, 1, 0)
+  })
+  
+  filtered_data$nrm_100d_time = with(filtered_data, {
+    nrm_within_100d = pt_status == 1 & tx_relapse == 0 & os_time <= 100
+    ifelse(nrm_within_100d, os_time, NA)
+  })
+  
   # create different lists for plot func input based on selection  
   if (surv_type == "OS") {
     list(
@@ -99,6 +119,22 @@ surv_param = function(surv_type, filtered_data) {
       subset_data = filtered_data, 
       surv_status = 'grfs_status', 
       surv_time = 'grfs_time', 
+      surv_type = 'surv_type', 
+      group_names = 'group'
+    )
+  } else if (surv_type == 'NRM') {
+    list(
+      subset_data = filtered_data, 
+      surv_status = 'nrm_status', 
+      surv_time = 'nrm_time', 
+      surv_type = 'surv_type', 
+      group_names = 'group'
+    )
+  } else if (surv_type == 'NRM_100') {
+    list(
+      subset_data = filtered_data, 
+      surv_status = 'nrm_100d_status', 
+      surv_time = 'nrm_100d_time', 
       surv_type = 'surv_type', 
       group_names = 'group'
     )

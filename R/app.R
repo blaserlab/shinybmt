@@ -17,6 +17,11 @@ shinyBMT <- function(data_dir, shiny_host = NULL, shiny_port = NULL) {
   options(shiny.host = shiny_host)
   options(shiny.port = shiny_port)
   options(shiny.launch.browser = FALSE)
+  
+  # get the data dictionary
+  dict <- get_dict(dir = data_dir)
+  
+  
   # manually select variables from dict to be incorporated in baseline selection
   inputId = c(
     'dx',
@@ -28,9 +33,7 @@ shinyBMT <- function(data_dir, shiny_host = NULL, shiny_port = NULL) {
     'tp_gvhd_prophy_mtx_yn',
     'tp_gvhd_prophy_csa_yn'
   )
-  # get the data dictionary
-  dict <- get_dict(dir = data_dir)
-  
+
   input_choices = select_input_choices(inputId, dict)
   
   # manually select variables to be included in the baseline table
@@ -39,11 +42,11 @@ shinyBMT <- function(data_dir, shiny_host = NULL, shiny_port = NULL) {
   tbl_variable_list = setNames(tbl_variable_name, map_variable_name(tbl_variable_name))
   
   # A selection of K-M functions
-  surv_selection = c('Please select...' = '', 'OS', 'RFS', 'GRFS')
+  surv_selection = c('Please select...' = '', 'OS', 'RFS', 'GRFS', 'NRM', 'NRM_100')
   cum_selection = c('Please select...' = '', 'ANC engraftment', 'Plt engraftment', 
                     'G2-4 aGvHD', 'G3-4 aGvHD')
   # A selection of Cox-regression outcomes
-  cox_selection = c('Please select...' = '', 'OS', 'RFS', 'GRFS','G2-4 aGvHD', 'G3-4 aGvHD')
+  cox_selection = c('Please select...' = '', 'OS', 'RFS', 'GRFS','G2-4 aGvHD', 'G3-4 aGvHD', 'NRM', 'NRM_100')
   # A selection of Cox-regression covariates
   cox_covariates_names = c('Group', 'Age (>=65)', 'Sex', 'Race', 'Diagnosis', 
                            'Prep type', 'Donor type', 'Disease status', 'HCT-CI (>=3)')
@@ -244,7 +247,7 @@ shinyBMT <- function(data_dir, shiny_host = NULL, shiny_port = NULL) {
       filtered_data = filter_hci_group(3, filtered_data)
       
       # Determine survival parameters
-      cox_params = if (input$cox_outcome_selection %in% c('OS', 'RFS', 'GRFS')) {
+      cox_params = if (input$cox_outcome_selection %in% c('OS', 'RFS', 'GRFS', 'NRM', 'NRM_100')) {
         surv_param(input$cox_outcome_selection, filtered_data)
       } else {
         cum_param(input$cox_outcome_selection, filtered_data)
