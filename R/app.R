@@ -19,7 +19,7 @@ shinyBMT <- function(data_dir, shiny_host = NULL, shiny_port = NULL) {
   options(shiny.launch.browser = FALSE)
   
   # get the data dictionary
-  dict <- get_dict(dir = data_dir)
+  dict = get_dict(dir = data_dir)
   
   
   # manually select variables from dict to be incorporated in baseline selection
@@ -157,6 +157,10 @@ shinyBMT <- function(data_dir, shiny_host = NULL, shiny_port = NULL) {
         if (choice == "") "All" else choice
       })
       
+      
+      # get the data
+      bmtdata <- get_bmtdata(dir = data_dir)
+      
       # generate filtered dataset based on selections 
       filtered_data = filter_data(age_range_1 = input$age_range1,
                                   age_range_2 = input$age_range2,
@@ -281,13 +285,11 @@ shinyBMT <- function(data_dir, shiny_host = NULL, shiny_port = NULL) {
     
     # Render the Cox regression results
     output$cox_reg_results = render_gt({
-      tryCatch({
         cox_table() %>%
           as_gt()
-      }, error = function(e) {
-        gt(tibble(Error = paste("An error occurred during Cox regression:", e$message)))
-      })
     })
+    
+
   }
   
   shinyApp(ui = ui, server = server)

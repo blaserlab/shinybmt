@@ -5,6 +5,8 @@
 #' @import dplyr
 #' @import tidyr
 #' @import readxl
+#' @import survival
+
 get_bmtdata <- function(dir) {
   bmtdata = read_excel(fs::path(dir, 'bmtdata.xlsx'))
   
@@ -67,6 +69,7 @@ surv_param = function(surv_type, filtered_data) {
   # define and adds new variables from source dataset
   filtered_data$os_time = as.integer(as.Date(filtered_data$last_fu) - 
                                        as.Date(filtered_data$tp_hct_date))
+  
   filtered_data$rfs_status = ifelse(filtered_data$pt_status==1 | filtered_data$tx_relapse==1,
                                     1, 0)
   filtered_data$rfs_time = with(filtered_data, {
@@ -103,7 +106,7 @@ surv_param = function(surv_type, filtered_data) {
       subset_data = filtered_data, 
       surv_status = 'pt_status', 
       surv_time = 'os_time', 
-      surv_type = 'surv_type', 
+      surv_type = surv_type, 
       group_names = 'group'
     )
   } else if (surv_type == 'RFS') {
@@ -111,7 +114,7 @@ surv_param = function(surv_type, filtered_data) {
       subset_data = filtered_data, 
       surv_status = 'rfs_status', 
       surv_time = 'rfs_time', 
-      surv_type = 'surv_type', 
+      surv_type = surv_type, 
       group_names = 'group'
     )
   } else if (surv_type == 'GRFS') {
@@ -119,7 +122,7 @@ surv_param = function(surv_type, filtered_data) {
       subset_data = filtered_data, 
       surv_status = 'grfs_status', 
       surv_time = 'grfs_time', 
-      surv_type = 'surv_type', 
+      surv_type = surv_type, 
       group_names = 'group'
     )
   } else if (surv_type == 'NRM') {
@@ -127,7 +130,7 @@ surv_param = function(surv_type, filtered_data) {
       subset_data = filtered_data, 
       surv_status = 'nrm_status', 
       surv_time = 'nrm_time', 
-      surv_type = 'surv_type', 
+      surv_type = surv_type, 
       group_names = 'group'
     )
   } else if (surv_type == 'NRM_100') {
@@ -135,7 +138,7 @@ surv_param = function(surv_type, filtered_data) {
       subset_data = filtered_data, 
       surv_status = 'nrm_100d_status', 
       surv_time = 'nrm_100d_time', 
-      surv_type = 'surv_type', 
+      surv_type = surv_type, 
       group_names = 'group'
     )
   }
@@ -188,7 +191,7 @@ cum_param = function(ci_type, filtered_data) {
       ci_time = 'anc_engraftment_time',
       surv_status = 'pt_status', 
       surv_time = 'os_time', 
-      ci_type = 'ci_type', 
+      ci_type = ci_type, 
       group_names = 'group'
     )
   } else if (ci_type == 'Plt engraftment') {
@@ -198,7 +201,7 @@ cum_param = function(ci_type, filtered_data) {
       ci_time = 'plt_engraftment_time',
       surv_status = 'pt_status', 
       surv_time = 'os_time', 
-      ci_type = 'ci_type', 
+      ci_type = ci_type, 
       group_names = 'group'
     )
   } else if (ci_type == 'G2-4 aGvHD') {
@@ -208,7 +211,7 @@ cum_param = function(ci_type, filtered_data) {
       ci_time = 'g2_4_gvhd_time',
       surv_status = 'pt_status', 
       surv_time = 'os_time', 
-      ci_type = 'ci_type', 
+      ci_type = ci_type, 
       group_names = 'group'
     )
   } else if (ci_type == 'G3-4 aGvHD') {
@@ -218,7 +221,7 @@ cum_param = function(ci_type, filtered_data) {
       ci_time = 'g3_4_gvhd_time',
       surv_status = 'pt_status', 
       surv_time = 'os_time', 
-      ci_type = 'ci_type', 
+      ci_type = ci_type, 
       group_names = 'group'
     )
   } 
