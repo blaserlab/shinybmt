@@ -10,6 +10,7 @@
 #' @import readxl
 #' @import shinyWidgets
 #' @import shiny
+#' @import kableExtra
 #' @export
 
 
@@ -242,8 +243,12 @@ shinyBMT <- function(data_dir, shiny_host = NULL, shiny_port = NULL) {
     
     
     ########## for cox-regression tab ##########
-    cox_table = reactive({
-      req(input$run_cox, input$cox_outcome_selection, input$cox_covariates)
+    # Define a reactive value to store the results
+    cox_results = reactiveVal(NULL)
+    
+    # Observer for the "Run Cox Regression" button
+    observeEvent(input$run_cox, {
+      req(input$cox_outcome_selection, input$cox_covariates)
       
       # Apply age group and HCI group filters
       filtered_data = reactive_filtered_data()
@@ -257,8 +262,8 @@ shinyBMT <- function(data_dir, shiny_host = NULL, shiny_port = NULL) {
         cum_param(input$cox_outcome_selection, filtered_data)
       }
       
-      # Perform Cox regression and return the tables
-      if (input$regression_type == "univariate") {
+      # Perform Cox regression and store the results
+      results = if (input$regression_type == "univariate") {
         uni_cox(
           surv_time = cox_params$surv_time,
           surv_status = cox_params$surv_status,
@@ -275,18 +280,16 @@ shinyBMT <- function(data_dir, shiny_host = NULL, shiny_port = NULL) {
           data = cox_params$subset_data
         )
       }
-    })
-    
-    # Observer for the "Run Cox Regression" button
-    observeEvent(input$run_cox, {
-      # This will trigger the cox_table reactive to re-execute
-      cox_table()
+      
+      # Update the reactive value with the new results
+      cox_results(results)
     })
     
     # Render the Cox regression results
-    output$cox_reg_results = render_gt({
-        cox_table() %>%
-          as_gt()
+    output$cox_reg_results <- render_gt({
+      req(cox_results())
+      cox_results() %>%
+        as_gt() 
     })
     
 
