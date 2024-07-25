@@ -24,10 +24,15 @@ shinyBMT <- function(data_dir, shiny_host = NULL, shiny_port = NULL) {
   
   
   # manually select variables from dict to be incorporated in baseline selection
-  inputId = c(
+  # inputID1 - those are set
+  # inputID2 - those are dynamic and can be searched and added
+  inputId1 = c(
     'dx',
     'tp_prep_class',
-    'tp_donor1_type',
+    'tp_donor1_type'
+  )
+  
+  inputId2 = c(
     'tp_gvhd_prophy_csa_yn',
     'tp_gvhd_prophy_fk506_yn',
     'tp_gvhd_prophy_mmf_yn',
@@ -35,7 +40,8 @@ shinyBMT <- function(data_dir, shiny_host = NULL, shiny_port = NULL) {
     'tp_gvhd_prophy_csa_yn'
   )
 
-  input_choices = select_input_choices(inputId, dict)
+  input_choices1 = select_input_choices(inputId1, dict)
+  input_choices2 = select_input_choices(inputId2, dict)
   
   # manually select variables to be included in the baseline table
   tbl_variable_name = c('Age', 'Sex', 'Race', 'Diagnosis', 'Prep type', 'Donor type')
@@ -62,26 +68,30 @@ shinyBMT <- function(data_dir, shiny_host = NULL, shiny_port = NULL) {
                         textInput("g1_name", "Name this group:", value='Group 1'),
                         sliderInput("age_range1", "Select Age Range:", 
                                     min = 0, max = 120, value = c(18, 120)),
-                        lapply(1:nrow(input_choices), function(i) {
-                          selectInput(paste0(input_choices$inputId[i], "1"),
+                        lapply(1:nrow(input_choices1), function(i) {
+                          selectInput(paste0(input_choices1$inputId[i], "1"),
                                       # naming is dx1, dx2, tp1, tp2, etc, for group1 and 2
-                                      sprintf("%s:", input_choices$variable_display[i]),
+                                      sprintf("%s:", input_choices1$variable_display[i]),
                                       # choices from original dataset + All + select...
-                                      choices = c('Select...'='', 'All'='All', 
-                                                  input_choices$choices[[i]]))
-                        })
+                                      choices = c('Select...'='', 'All'='All',
+                                                  input_choices1$choices[[i]]))
+                        }),
+                        uiOutput("dynamic_inputs1"),  # placeholder for dynamically adding rows
+                        actionButton("add_row1", "Add New Row")
                  ),
                  column(3,
                         tags$h3("Group 2"),
                         textInput("g2_name", "Name this group:", value='Group 2'),
                         sliderInput("age_range2", "Select Age Range:", 
                                     min = 0, max = 120, value = c(18, 120)),
-                        lapply(1:nrow(input_choices), function(i) {
-                          selectInput(paste0(input_choices$inputId[i], "2"),
-                                      sprintf("%s:", input_choices$variable_display[i]),
+                        lapply(1:nrow(input_choices1), function(i) {
+                          selectInput(paste0(input_choices1$inputId[i], "2"),
+                                      sprintf("%s:", input_choices1$variable_display[i]),
                                       choices = c('Select...'='', 'All'='All',
-                                                  input_choices$choices[[i]]))
-                        })
+                                                  input_choices1$choices[[i]]))
+                        }),
+                        uiOutput("dynamic_inputs2"),
+                        actionButton("add_row2", "Add New Row")
                  ),
                  div(style = "text-align: center; margin-top: 20px;",
                      actionButton("gen_tbl", "Generate Baseline Table", class='btn-primary')),
@@ -132,19 +142,114 @@ shinyBMT <- function(data_dir, shiny_host = NULL, shiny_port = NULL) {
       updateSliderInput(session, "age_range2", 
                         value = input$age_range1)
     }, ignoreInit = TRUE)
-    # selection input synchronization
-    for (i in 1:nrow(input_choices)) {
+    
+    # selection input synchronization for the set inputs
+    for (i in 1:nrow(input_choices1)) {
       local({
         idx = i
-        inputId1 = paste0(input_choices$inputId[idx], "1")
-        inputId2 = paste0(input_choices$inputId[idx], "2")
-        observeEvent(input[[inputId1]], {
-          updateSelectInput(session, inputId2, selected = input[[inputId1]])
+        inputId_g1 = paste0(input_choices1$inputId[idx], "1")
+        inputId_g2 = paste0(input_choices1$inputId[idx], "2")
+        observeEvent(input[[inputId_g1]], {
+          updateSelectInput(session, inputId_g2, selected = input[[inputId_g1]])
         }, ignoreInit = TRUE)
       })
     }
     
-    # function button action
+    # Reactive values to store the number of rows for each group
+    row_count1 = reactiveVal(1)
+    row_count2 = reactiveVal(1)
+    
+    # Reactive lists to store input values for each group
+    g1_inputs = reactiveValues()
+    g2_inputs = reactiveValues()
+    
+    # Create the 1st row for Group 1 and 2
+    output$dynamic_inputs1 = renderUI({
+      create_row(1, "g1", input_choices2)
+    })
+    output$dynamic_inputs2 = renderUI({
+      create_row(1, "g2", input_choices2)
+    })
+    
+    # "Add row" button logistics for Group 1
+    observeEvent(input$add_row1, {
+      save_inputs("row_count1", row_count1, row_count2, g1_inputs, g2_inputs, input) 
+      # save contents of previous rows
+      new_row_count = row_count1() + 1
+      row_count1(new_row_count)
+      row_count2(max(row_count2(), new_row_count))  # Ensure Group 2 has at least as many rows
+      output$dynamic_inputs1 = renderUI({
+        lapply(1:row_count1(), function(i) {
+          create_row(i, "g1", input_choices2)
+        }) # recreate k+1 empty rows for group 1
+      })
+      output$dynamic_inputs2 = renderUI({
+        lapply(1:row_count2(), function(i) {
+          create_row(i, "g2", input_choices2)
+        }) # recreate k+1/row_count2 empty rows for group 2
+      })
+      restore_inputs("row_count1", input_choices2, row_count1, row_count2, g1_inputs, g2_inputs, session)
+    })
+    
+    # Add row button for Group 2
+    observeEvent(input$add_row2, {
+      save_inputs("row_count2", row_count1, row_count2, g1_inputs, g2_inputs, input)
+      new_row_count <- row_count2() + 1
+      row_count2(new_row_count)
+      row_count1(max(row_count1(), new_row_count))
+      output$dynamic_inputs2 <- renderUI({
+        lapply(1:row_count2(), function(i) {
+          create_row(i, "g2", input_choices2)
+        })
+      })
+      output$dynamic_inputs1 <- renderUI({
+        lapply(1:row_count1(), function(i) {
+          create_row(i, "g1", input_choices2)
+        })
+      })
+      restore_inputs("row_count2", input_choices2, row_count1, row_count2, g1_inputs, g2_inputs, session)
+    })
+    
+    
+    # while add row restores all previous selections,  still need to  
+    # update value choices real-time during normal interaction without needing to click add row
+    observe({
+      lapply(1:max(row_count1(), row_count2()), function(i) {
+        lapply(c("g1", "g2"), function(group) {
+          search_id = paste0("search_", group, "_", i)
+          value_id = paste0("value_", group, "_", i)
+          
+          observeEvent(input[[search_id]], {
+            if (!is.null(input[[search_id]]) && input[[search_id]] != "") {
+              selected_var = input[[search_id]]
+              matching_index = which(input_choices2$variable_display == selected_var)
+              
+              if (length(matching_index) > 0) {
+                choices = input_choices2$choices[[matching_index[1]]]
+                updateSelectizeInput(session, value_id,
+                                     choices = c("Select..." = "", choices),
+                                     selected = isolate(input[[value_id]]))
+                
+                # Synchronize search selection to the other group
+                other_group = if(group == "g1") "g2" else "g1"
+                updateSelectizeInput(session, paste0("search_", other_group, "_", i), selected = selected_var)
+              } else {
+                # Handle the case where no matching variable display is found
+                updateSelectizeInput(session, value_id,
+                                     choices = c("Select..." = ""),
+                                     selected = character(0))
+              }
+            }
+          }, ignoreInit = TRUE)
+        })
+      })
+    })
+    
+    # print
+    print (g1_inputs())
+    print (g2_inputs())
+    
+    # function button (gen_tbl) action
     reactive_filtered_data = reactiveVal()
     observeEvent(input$gen_tbl, {
       # Extract choices from both groups and
@@ -157,7 +262,6 @@ shinyBMT <- function(data_dir, shiny_host = NULL, shiny_port = NULL) {
         choice = input[[paste0(id, "2")]]
         if (choice == "") "All" else choice
       })
-      
       
       # get the data
       bmtdata <- get_bmtdata(dir = data_dir)

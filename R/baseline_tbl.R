@@ -3,6 +3,9 @@
 #' @import dplyr
 #' @import tidyr
 #' @import gtsummary
+#' 
+#' 
+# return a datafarme with variable, label, and options for given variables based on the data dict
 select_input_choices = function(inputId, dict) {
   filtered_dict = dict %>% filter(variable %in% inputId)
   input_choices = data.frame(
@@ -14,6 +17,77 @@ select_input_choices = function(inputId, dict) {
   return(input_choices)
 }
 
+# UI to create a new row of inputs, with 2 columns (e.g. search_g1_1 and value_g1_1)
+# search is single search/selection, value is single/multiple selections
+# choices are input_choices2 (the name is specific)
+create_row = function(id, group, input_choice) {
+  fluidRow(
+    column(6, 
+           selectizeInput(
+             inputId = paste0("search_", group, "_", id),
+             label = NULL,
+             choices = c("Select..." = "", input_choice$variable_display),
+             options = list(
+               placeholder = 'Type to search...',
+               onInitialize = I('function() { this.setValue(""); }')
+             )
+           )
+    ),
+    column(6,
+           selectizeInput(
+             inputId = paste0("value_", group, "_", id),
+             label = NULL,
+             choices = c("Select..." = ""),
+             multiple = TRUE,
+             options = list(placeholder = 'Select value(s)...')
+           )
+    )
+  )
+}
+
+# function to save inputs of all previous rows into a input_list
+# input is row_count which is an integer
+# input/output list format (search_g1_1 = '', value_g1_1 = '',...)
+save_inputs = function(group, row_count1, row_count2, g1_inputs, g2_inputs, input) {
+  row_count = if (group == "row_count1") row_count1() else row_count2()
+  input_list = if (group == "row_count1") g1_inputs else g2_inputs
+  
+  for (i in 1:row_count) {
+    g <- if (group == "row_count1") "g1" else "g2"
+    input_list[[paste0("search_", g, "_", i)]] <- input[[paste0("search_", g, "_", i)]]
+    input_list[[paste0("value_", g, "_", i)]] <- input[[paste0("value_", g, "_", i)]]
+  }
+}
+
+# Function to restore input values (g1_inputs and g2_inputs) from input_list
+restore_inputs = function(group, input_choices, row_count1, row_count2, g1_inputs, g2_inputs, session) {
+  row_count = if (group == "row_count1") row_count1() else row_count2()
+  input_list = if (group == "row_count1") g1_inputs else g2_inputs
+  
+  for (i in 1:row_count) {
+    g = if (group == "row_count1") "g1" else "g2"
+    other_g = if (g == "g1") "g2" else "g1"
+    
+    if (!is.null(input_list[[paste0("search_", g, "_", i)]])) {
+      updateSelectizeInput(session, 
+                           paste0("search_", g, "_", i), 
+                           selected = input_list[[paste0("search_", g, "_", i)]])
+      
+      # Synchronize search selection to the other group
+      updateSelectizeInput(session, 
+                           paste0("search_", other_g, "_", i), 
+                           selected = input_list[[paste0("search_", g, "_", i)]])
+      
+      if (!is.null(input_list[[paste0("value_", g, "_", i)]])) {
+        updateSelectizeInput(session, 
+                             paste0("value_", g, "_", i), 
+                             choices = c("Select..." = "", 
+                                         input_choices$choices[[which(input_choices$variable_display == input_list[[paste0("search_", g, "_", i)]])]]), 
+                             selected = input_list[[paste0("value_", g, "_", i)]])
+      }
+    }
+  }
+}
 
 # filter age based on a range, and doe (date of event), dob (date of birth)
 # create a new variable named 'new_age'
