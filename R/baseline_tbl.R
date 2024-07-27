@@ -45,48 +45,97 @@ create_row = function(id, group, input_choice) {
   )
 }
 
-# function to save inputs of all previous rows into a input_list
-# input is row_count which is an integer
-# input/output list format (search_g1_1 = '', value_g1_1 = '',...)
-save_inputs = function(group, row_count1, row_count2, g1_inputs, g2_inputs, input) {
-  row_count = if (group == "row_count1") row_count1() else row_count2()
-  input_list = if (group == "row_count1") g1_inputs else g2_inputs
-  
+# function to save inputs of all previous rows 
+# output 2 lists with format (search_g1_1 = '', value_g1_1 = '',...)
+save_inputs = function(row_count, g1_inputs, g2_inputs, input) {
   for (i in 1:row_count) {
-    g <- if (group == "row_count1") "g1" else "g2"
-    input_list[[paste0("search_", g, "_", i)]] <- input[[paste0("search_", g, "_", i)]]
-    input_list[[paste0("value_", g, "_", i)]] <- input[[paste0("value_", g, "_", i)]]
+    g1_inputs[[paste0("search_g1_", i)]] = input[[paste0("search_g1_", i)]]
+    g1_inputs[[paste0("value_g1_", i)]] = input[[paste0("value_g1_", i)]]
+    g2_inputs[[paste0("search_g2_", i)]] = input[[paste0("search_g2_", i)]]
+    g2_inputs[[paste0("value_g2_", i)]] = input[[paste0("value_g2_", i)]]
   }
 }
 
-# Function to restore input values (g1_inputs and g2_inputs) from input_list
-restore_inputs = function(group, input_choices, row_count1, row_count2, g1_inputs, g2_inputs, session) {
-  row_count = if (group == "row_count1") row_count1() else row_count2()
-  input_list = if (group == "row_count1") g1_inputs else g2_inputs
-  
+# Function to restore input values (g1_inputs and g2_inputs) from g1/g2_input_list
+# Function to restore input values (g1_inputs and g2_inputs) from g1/g2_input_list
+restore_inputs = function(input_choices, row_count, g1_inputs, g2_inputs, session) {
   for (i in 1:row_count) {
-    g = if (group == "row_count1") "g1" else "g2"
-    other_g = if (g == "g1") "g2" else "g1"
     
-    if (!is.null(input_list[[paste0("search_", g, "_", i)]])) {
+    if (!is.null(g1_inputs[[paste0("search_g1_", i)]])) {
       updateSelectizeInput(session, 
-                           paste0("search_", g, "_", i), 
-                           selected = input_list[[paste0("search_", g, "_", i)]])
+                           paste0("search_g1_", i), 
+                           selected = g1_inputs[[paste0("search_g1_", i)]])
       
-      # Synchronize search selection to the other group
       updateSelectizeInput(session, 
-                           paste0("search_", other_g, "_", i), 
-                           selected = input_list[[paste0("search_", g, "_", i)]])
+                           paste0("search_g2_", i), 
+                           selected = g2_inputs[[paste0("search_g2_", i)]])
       
-      if (!is.null(input_list[[paste0("value_", g, "_", i)]])) {
+      # restore value selections
+      if (!is.null(g1_inputs[[paste0("value_g1_", i)]])) {
         updateSelectizeInput(session, 
-                             paste0("value_", g, "_", i), 
+                             paste0("value_g1_", i), 
                              choices = c("Select..." = "", 
-                                         input_choices$choices[[which(input_choices$variable_display == input_list[[paste0("search_", g, "_", i)]])]]), 
-                             selected = input_list[[paste0("value_", g, "_", i)]])
+                                         input_choices$choices[[which(input_choices$variable_display == g1_inputs[[paste0("search_g1_", i)]])]]), 
+                             selected = g1_inputs[[paste0("value_g1_", i)]])
+      }
+      
+      if (!is.null(g2_inputs[[paste0("value_g2_", i)]])) {
+        updateSelectizeInput(session, 
+                             paste0("value_g2_", i), 
+                             choices = c("Select..." = "", 
+                                         input_choices$choices[[which(input_choices$variable_display == g2_inputs[[paste0("search_g2_", i)]])]]), 
+                             selected = g2_inputs[[paste0("value_g2_", i)]])
       }
     }
   }
+}
+
+
+# transform g1_inputs and g2_inputs into a list format
+# from (search_g1_1='variable_display', value_g1_1='a', ) to list ('variable_display' = 'a', '' = '', ), 
+# then to ('inputId' = 'a', '' = '', )
+transform_group_inputs <- function(group_inputs, group_number, input_choices) {
+  result <- list()
+  
+  # Validate group_number
+  if (!group_number %in% c(1, 2)) {
+    stop("group_number must be either 1 or 2")
+  }
+  
+  # Create the search prefix based on group number
+  search_prefix <- paste0("search_g", group_number, "_")
+  value_prefix <- paste0("value_g", group_number, "_")
+  
+  # Get all the search keys
+  search_keys <- names(group_inputs)[grep(paste0("^", search_prefix), names(group_inputs))]
+  
+  for (key in search_keys) {
+    # Extract the index
+    index <- sub(search_prefix, "", key)
+    
+    # Get the corresponding value key
+    value_key <- paste0(value_prefix, index)
+    
+    # Get the search criterion and its corresponding values
+    criterion <- group_inputs[[key]]
+    values <- group_inputs[[value_key]]
+    
+    # If value is NULL, change it to All
+    if (is.null(values)) {
+      values = "All"
+    }
+    
+    # Add to the result list, but only if values are not empty
+    if (length(values) > 0 && !all(values == "")) {
+      result[[criterion]] <- values
+    }
+  }
+  
+  # mapping from list ('variable_display' = 'a', ) to ('inputId' = 'a', )
+  mapping = setNames(input_choices$inputId, input_choices$variable_display)
+  names(result) = mapping[names(result)]
+  
+  return(result)
 }
 
 # filter age based on a range, and doe (date of event), dob (date of birth)
@@ -146,6 +195,24 @@ filter_hci_group = function (k, data) {
 }
 
 
+# filter based on date range
+#' @import dplyr
+filter_date = function(start_date, end_date, event_date, data) {
+  # Convert input dates to Date objects
+  start_date = as.Date(start_date)
+  end_date = as.Date(end_date)
+  
+  # Ensure the event_date column is in Date format
+  data = data %>%
+    mutate(!!event_date := as.Date(!!sym(event_date)))
+  
+  # Filter the data
+  filtered_data = data %>%
+    filter(!!sym(event_date) >= start_date & !!sym(event_date) <= end_date)
+  
+  return(filtered_data)
+}
+
 
 # based on input selections (list_choice) to filter data and create Group 1 and 2
 # return filtered data, with a new variable "group" with names from "group_name"
@@ -153,33 +220,47 @@ filter_hci_group = function (k, data) {
 #' @import tidyr
 #' @import gtsummary
 filter_data = function(age_range_1, age_range_2, dob, doe,
-                       list_choice_1, list_choice_2, inputId, 
+                       list_choice_1, list_choice_2,
                        group_name_1, group_name_2, data) {
+
+  if (length(list_choice_1) != length(list_choice_2)) {
+    stop("Error: list_choice_1 and list_choice_2 have different lengths")
+  }
   # Start filtering based on age ranges for both groups
   filtered_group1 = filter_age(age_range_1, dob, doe, data)
   filtered_group2 = filter_age(age_range_2, dob, doe, data)
-  
+
+  # Helper function to apply filters
+  apply_filters <- function(filtered_data, choices) {
+    for (column_name in names(choices)) {
+      values <- choices[[column_name]]
+      if (is.list(values)) {
+        # Handle case where values is a list 
+        values <- unlist(values)
+      }
+
+      # Ensure `values` is not NULL and has length > 0
+      if (!is.null(values) && length(values) > 0) {
+        # Only filter when "All" is not selected and values are not empty
+        if (!identical(values, "All") && any(values != "")) {
+          filtered_data <- filtered_data[filtered_data[[column_name]] %in% values, ]
+        }
+      }
+    }
+    return(filtered_data)
+  }
+
   # Filter data for Group 1
-  for (i in seq_along(inputId)) {
-    if (list_choice_1[i] != "All") {
-      # Apply filter only if the choice is not "All"
-      filtered_group1 = filtered_group1[filtered_group1[[inputId[i]]] == list_choice_1[i], ]
-    }
-  }
-  
+  filtered_group1 = apply_filters(filtered_group1, list_choice_1)
+
   # Filter data for Group 2
-  for (i in seq_along(inputId)) {
-    if (list_choice_2[i] != "All") {
-      # Apply filter only if the choice is not "All"
-      filtered_group2 = filtered_group2[filtered_group2[[inputId[i]]] == list_choice_2[i], ]
-    }
-  }
-  
+  filtered_group2 = apply_filters(filtered_group2, list_choice_2)
+
   # Assign group labels by creating a new variable "group"
   filtered_group1$group = group_name_1
   filtered_group2$group = group_name_2
-  
+
   filtered_data = rbind(filtered_group1, filtered_group2)
-  
+
   return(filtered_data)
 }

@@ -62,41 +62,88 @@ shinyBMT <- function(data_dir, shiny_host = NULL, shiny_port = NULL) {
   ui <- fluidPage(
     tabsetPanel(
       tabPanel("Baseline Selection",
+               tags$head(
+                 tags$style(HTML("
+      .panel-title { font-size: 24px; font-weight: bold; margin-bottom: 20px; }
+      .additional-criteria { font-size: 18px; font-weight: bold; text-align: center; margin-top: 30px; }
+      hr { border-top: 2px dashed #95a5a6; margin-top: 10px; margin-bottom: 30px; }
+      .btn-primary { background-color: #3498db; border-color: #2980b9; }
+      .btn-primary:hover { background-color: #2980b9; border-color: #2980b9; }
+      .group-column { padding: 20px; border-radius: 8px; }
+      .group-1 { background-color: #ecf0f1; }
+      .group-2 { background-color: #e8f6f3; }
+    "))
+               ),
                fluidRow(
                  column(3,
-                        tags$h3("Group 1"),
-                        textInput("g1_name", "Name this group:", value='Group 1'),
-                        sliderInput("age_range1", "Select Age Range:", 
-                                    min = 0, max = 120, value = c(18, 120)),
-                        lapply(1:nrow(input_choices1), function(i) {
-                          selectInput(paste0(input_choices1$inputId[i], "1"),
-                                      # naming is dx1, dx2, tp1, tp2, etc, for group1 and 2
-                                      sprintf("%s:", input_choices1$variable_display[i]),
-                                      # choices from original dataset + All + select...
-                                      choices = c('Select...'='', 'All'='All',
-                                                  input_choices1$choices[[i]]))
-                        }),
-                        uiOutput("dynamic_inputs1"),  # placeholder for dynamically adding rows
-                        actionButton("add_row1", "Add New Row")
+                        div(class = "group-column group-1",
+                            tags$h3("Group 1", class = "panel-title"),
+                            textInput("g1_name", "Name this group:", value='Group 1'),
+                            sliderInput("age_range1", "Select age range:", 
+                                        min = 0, max = 120, value = c(18, 120)),
+                            dateRangeInput("transplant_date1", "Transplant date:",
+                                           start = as.Date(paste0(as.integer(format(Sys.Date(), "%Y")) - 10, "-01-01")),
+                                           end = Sys.Date(),
+                                           format = "MM/yyyy",
+                                           startview = "year"),
+                            lapply(1:nrow(input_choices1), function(i) {
+                              selectizeInput(
+                                inputId = paste0(input_choices1$inputId[i], "1"),
+                                label = sprintf("%s:", input_choices1$variable_display[i]),
+                                choices = c('Select...' = '', 'All', input_choices1$choices[[i]]),
+                                multiple = TRUE,
+                                options = list(
+                                  placeholder = 'Select options',
+                                  onInitialize = I('function() { this.setValue(""); }')
+                                )
+                              )
+                            }),
+                            tags$div(class = "additional-criteria", "Additional criteria"),
+                            tags$hr(), 
+                            uiOutput("dynamic_inputs1"),
+                            div(style = "display: flex; justify-content: flex-end; align-items: center; margin-top: 20px; padding-right: 0px;",
+                                actionButton("add_row", "Add New Row", class = "btn-info")
+                            )
+                        )
                  ),
                  column(3,
-                        tags$h3("Group 2"),
-                        textInput("g2_name", "Name this group:", value='Group 2'),
-                        sliderInput("age_range2", "Select Age Range:", 
-                                    min = 0, max = 120, value = c(18, 120)),
-                        lapply(1:nrow(input_choices1), function(i) {
-                          selectInput(paste0(input_choices1$inputId[i], "2"),
-                                      sprintf("%s:", input_choices1$variable_display[i]),
-                                      choices = c('Select...'='', 'All'='All',
-                                                  input_choices1$choices[[i]]))
-                        }),
-                        uiOutput("dynamic_inputs2"),
-                        actionButton("add_row2", "Add New Row")
+                        div(class = "group-column group-2",
+                            tags$h3("Group 2", class = "panel-title"),
+                            textInput("g2_name", "Name this group:", value='Group 2'),
+                            sliderInput("age_range2", "Select age range:", 
+                                        min = 0, max = 120, value = c(18, 120)),
+                            dateRangeInput("transplant_date2", "Transplant date:",
+                                           start = as.Date(paste0(as.integer(format(Sys.Date(), "%Y")) - 10, "-01-01")),
+                                           end = Sys.Date(),
+                                           format = "MM/yyyy",
+                                           startview = "year"),
+                            lapply(1:nrow(input_choices1), function(i) {
+                              selectizeInput(
+                                inputId = paste0(input_choices1$inputId[i], "2"),
+                                label = sprintf("%s:", input_choices1$variable_display[i]),
+                                choices = c('Select...' = '', 'All', input_choices1$choices[[i]]),
+                                multiple = TRUE,
+                                options = list(
+                                  placeholder = 'Select options',
+                                  onInitialize = I('function() { this.setValue(""); }')
+                                )
+                              )
+                            }),
+                            tags$div(class = "additional-criteria", "Additional criteria"),
+                            tags$hr(), 
+                            uiOutput("dynamic_inputs2")
+                        )
                  ),
-                 div(style = "text-align: center; margin-top: 20px;",
-                     actionButton("gen_tbl", "Generate Baseline Table", class='btn-primary')),
-                 column(6, gt_output("baseline_chrcs"))
-               )),
+                 div(style = "text-align: center; margin-top: 30px;",
+                     actionButton("gen_tbl", "Generate Baseline Table", 
+                                  class = 'btn-primary')),
+                 column(6, 
+                        div(class = "well", style = "margin-top: 20px;",
+                            gt_output("baseline_chrcs")
+                        )
+                 )
+               )
+      ),
       tabPanel("Time-to-Event Analysis",
                sidebarPanel(
                  selectInput("curve_type_surv", "Survival analysis:", 
@@ -143,6 +190,36 @@ shinyBMT <- function(data_dir, shiny_host = NULL, shiny_port = NULL) {
                         value = input$age_range1)
     }, ignoreInit = TRUE)
     
+    # date selection synchronization
+    # Error handling for transplant_date1
+    observeEvent(input$transplant_date1, {
+      date_range = input$transplant_date1
+      if (date_range[2] <= date_range[1]) {
+        showNotification(
+          "Error: End date must be later than start date for Group 1",
+          type = "error",
+          duration = NULL
+        )
+      } else {
+        # If the date range is valid, update transplant_date2
+        updateDateRangeInput(session, "transplant_date2",
+                             start = date_range[1],
+                             end = date_range[2])
+      }
+    }, ignoreInit = TRUE)
+    
+    # Error handling for transplant_date2
+    observeEvent(input$transplant_date2, {
+      date_range = input$transplant_date2
+      if (date_range[2] <= date_range[1]) {
+        showNotification(
+          "Error: End date must be later than start date for Group 2",
+          type = "error",
+          duration = NULL
+        )
+      }
+    }, ignoreInit = TRUE)
+    
     # selection input synchronization for the set inputs
     for (i in 1:nrow(input_choices1)) {
       local({
@@ -156,14 +233,13 @@ shinyBMT <- function(data_dir, shiny_host = NULL, shiny_port = NULL) {
     }
     
     # Reactive values to store the number of rows for each group
-    row_count1 = reactiveVal(1)
-    row_count2 = reactiveVal(1)
+    row_count = reactiveVal(1)
     
     # Reactive lists to store input values for each group
     g1_inputs = reactiveValues()
     g2_inputs = reactiveValues()
     
-    # Create the 1st row for Group 1 and 2
+    # Initialize the 1st row for Group 1 and 2
     output$dynamic_inputs1 = renderUI({
       create_row(1, "g1", input_choices2)
     })
@@ -172,49 +248,25 @@ shinyBMT <- function(data_dir, shiny_host = NULL, shiny_port = NULL) {
     })
     
     # "Add row" button logistics for Group 1
-    observeEvent(input$add_row1, {
-      save_inputs("row_count1", row_count1, row_count2, g1_inputs, g2_inputs, input) 
-      # save contents of previous rows
-      new_row_count = row_count1() + 1
-      row_count1(new_row_count)
-      row_count2(max(row_count2(), new_row_count))  # Ensure Group 2 has at least as many rows
+    observeEvent(input$add_row, {
+      save_inputs(row_count(), g1_inputs, g2_inputs, input) 
+      # save contents of previous rows for g1 and g2
+      row_count(row_count() + 1)
       output$dynamic_inputs1 = renderUI({
-        lapply(1:row_count1(), function(i) {
+        lapply(1:row_count(), function(i) {
           create_row(i, "g1", input_choices2)
         }) # recreate k+1 empty rows for group 1
       })
       output$dynamic_inputs2 = renderUI({
-        lapply(1:row_count2(), function(i) {
+        lapply(1:row_count(), function(i) {
           create_row(i, "g2", input_choices2)
-        }) # recreate k+1/row_count2 empty rows for group 2
+        }) # recreate k+1 empty rows for group 2
       })
-      restore_inputs("row_count1", input_choices2, row_count1, row_count2, g1_inputs, g2_inputs, session)
+      restore_inputs(input_choices2, row_count(), g1_inputs, g2_inputs, session)
     })
     
-    # Add row button for Group 2
-    observeEvent(input$add_row2, {
-      save_inputs("row_count2", row_count1, row_count2, g1_inputs, g2_inputs, input)
-      new_row_count <- row_count2() + 1
-      row_count2(new_row_count)
-      row_count1(max(row_count1(), new_row_count))
-      output$dynamic_inputs2 <- renderUI({
-        lapply(1:row_count2(), function(i) {
-          create_row(i, "g2", input_choices2)
-        })
-      })
-      output$dynamic_inputs1 <- renderUI({
-        lapply(1:row_count1(), function(i) {
-          create_row(i, "g1", input_choices2)
-        })
-      })
-      restore_inputs("row_count2", input_choices2, row_count1, row_count2, g1_inputs, g2_inputs, session)
-    })
-    
-    
-    # while add row restores all previous selections,  still need to  
-    # update value choices real-time during normal interaction without needing to click add row
     observe({
-      lapply(1:max(row_count1(), row_count2()), function(i) {
+      lapply(1:row_count(), function(i) {
         lapply(c("g1", "g2"), function(group) {
           search_id = paste0("search_", group, "_", i)
           value_id = paste0("value_", group, "_", i)
@@ -239,46 +291,78 @@ shinyBMT <- function(data_dir, shiny_host = NULL, shiny_port = NULL) {
                                      choices = c("Select..." = ""),
                                      selected = character(0))
               }
+            } else {
+              # Handle the case where search_id input is NULL or empty
+              updateSelectizeInput(session, value_id,
+                                   choices = c("Select..." = ""),
+                                   selected = "All")
             }
           }, ignoreInit = TRUE)
         })
       })
     })
     
-    # print
-    print (g1_inputs())
-    print (g2_inputs())
     
     # function button (gen_tbl) action
     reactive_filtered_data = reactiveVal()
     observeEvent(input$gen_tbl, {
-      # Extract choices from both groups and
+      
+      save_inputs(row_count(), g1_inputs, g2_inputs, input) 
+      transformed_g1 = transform_group_inputs(g1_inputs, 1, input_choices2)
+      transformed_g2 = transform_group_inputs(g2_inputs, 2, input_choices2)
+
+      # Check for duplicates
+      if(any(duplicated(names(transformed_g1)))) {
+        showNotification("There are duplicate criteria", type = "error")
+        return()  # Exit the observe Event early if duplicates are found
+      }
+      
+      # Extract choices from set groups and
       # if 'Select...' (empty string) is chosen then replace with 'All'
-      selections_group1 = lapply(inputId, function(id) {
+      selections_group1 = lapply(inputId1, function(id) {
         choice = input[[paste0(id, "1")]]
-        if (choice == "") "All" else choice
-      })
-      selections_group2 = lapply(inputId, function(id) {
-        choice = input[[paste0(id, "2")]]
-        if (choice == "") "All" else choice
+        if (length(choice) == 0 || "All" %in% choice) "All" else choice
       })
       
-      # get the data
+      selections_group2 = lapply(inputId1, function(id) {
+        choice = input[[paste0(id, "2")]]
+        if (length(choice) == 0 || "All" %in% choice) "All" else choice
+      })
+      
+      # add a name column for selections_group1/2
+      names(selections_group1) = inputId1
+      names(selections_group2) = inputId1
+      
+
+      ##### get the data #####
       bmtdata <- get_bmtdata(dir = data_dir)
       
-      # generate filtered dataset based on selections 
+      # filter data
       filtered_data = filter_data(age_range_1 = input$age_range1,
                                   age_range_2 = input$age_range2,
                                   dob = 'pt_dob',
                                   doe = 'tp_hct_date',
-                                  list_choice_1 = selections_group1, 
-                                  list_choice_2 = selections_group2, 
-                                  inputId, 
+                                  list_choice_1 = c(selections_group1, transformed_g1), 
+                                  list_choice_2 = c(selections_group2, transformed_g2), 
                                   group_name_1 = input$g1_name, 
                                   group_name_2 = input$g2_name, 
                                   data = bmtdata)
+      
+      # further filter data based on defined transplant data range
+      filtered_data = rbind(
+        filter_date(input$transplant_date1[1], 
+                    input$transplant_date1[2], 
+                    'tp_hct_date', 
+                    filtered_data %>% filter(group == input$g1_name)),
+        filter_date(input$transplant_date2[1], 
+                    input$transplant_date2[2], 
+                    'tp_hct_date',  
+                    filtered_data %>% filter(group == input$g2_name))
+      )
+      
+      # error handling if no patients left
       if (nrow(filtered_data) == 0) {
-        showNotification("No data matches the selected criteria. Please adjust your selections.", 
+        showNotification("No patients matches the selected criteria. Please adjust your selections.", 
                          type = "error")
         reactive_filtered_data(NULL)
       } else {
