@@ -12,7 +12,7 @@ get_bmtdata <- function(dir) {
   
 }
 
-# surv_selection = c('Please select...' = '', 'OS', 'RFS', 'GRFS', 'NRM', 'NRM_100')
+# surv_selection = c('Please select...' = '', 'OS', 'RFS', 'GRFS')
 # In this dataset
 # 20: pt_status: did the pt die, c(1,0)
 # 19: last_fu: data of last follow up or death, YYYY-MM-DD
@@ -79,26 +79,7 @@ surv_param = function(surv_type, filtered_data) {
   })
   
   filtered_data = calculate_grfs(filtered_data)
-  
-  filtered_data$nrm_status = ifelse(filtered_data$pt_status == 1 & 
-                                      filtered_data$tx_relapse == 0, 1, 0)
-  
-  
-  filtered_data$nrm_time = with(filtered_data, {
-    days_to_death = as.integer(as.Date(last_fu) - as.Date(tp_hct_date))
-    days_to_relapse = as.integer(as.Date(tx_relapse_date) - as.Date(tp_hct_date))
-    ifelse(nrm_status == 1, days_to_death, NA)
-  }) # if pt did not die or die d/t relapse, nrm time is set to NA
-  
-  filtered_data$nrm_100d_status = with(filtered_data, {
-    nrm_within_100d = pt_status == 1 & tx_relapse == 0 & os_time <= 100
-    ifelse(nrm_within_100d, 1, 0)
-  })
-  
-  filtered_data$nrm_100d_time = with(filtered_data, {
-    nrm_within_100d = pt_status == 1 & tx_relapse == 0 & os_time <= 100
-    ifelse(nrm_within_100d, os_time, NA)
-  })
+
   
   # create different lists for plot func input based on selection  
   if (surv_type == "OS") {
@@ -125,27 +106,11 @@ surv_param = function(surv_type, filtered_data) {
       surv_type = surv_type, 
       group_names = 'group'
     )
-  } else if (surv_type == 'NRM') {
-    list(
-      subset_data = filtered_data, 
-      surv_status = 'nrm_status', 
-      surv_time = 'nrm_time', 
-      surv_type = surv_type, 
-      group_names = 'group'
-    )
-  } else if (surv_type == 'NRM_100') {
-    list(
-      subset_data = filtered_data, 
-      surv_status = 'nrm_100d_status', 
-      surv_time = 'nrm_100d_time', 
-      surv_type = surv_type, 
-      group_names = 'group'
-    )
-  }
+  } 
 }
 
 
-# cum_selection = c('Please select...' = '', 'ANC engraftment', 'Plt engraftment', 
+# cum_selection = c('Please select...' = '', 'NRM, 'ANC engraftment', 'Plt engraftment', 
 #                   'G2-4 aGvHD', 'G3-4 aGvHD')
 
 # In this dataset
@@ -182,6 +147,24 @@ cum_param = function(ci_type, filtered_data) {
                                          as.integer(as.Date(filtered_data$ptp_agvhd_max_grade_date) - 
                                                       as.Date(filtered_data$tp_hct_date)), 
                                          NA)
+  
+  filtered_data$nrm_status = with(filtered_data, {
+    case_when(
+      pt_status == 1 & tx_relapse == 0  ~ 1,  # NRM -1
+      tx_relapse == 1  ~ 2,                   # Relapse -2
+      TRUE ~ 0                                # Censored -0
+    )
+  })
+  
+  filtered_data$nrm_time = with(filtered_data, {
+    days_to_death = as.integer(as.Date(last_fu) - as.Date(tp_hct_date))
+    days_to_relapse = as.integer(as.Date(tx_relapse_date) - as.Date(tp_hct_date))
+    ifelse(nrm_status == 1, days_to_death, NA)
+  }) # if pt did not die or die d/t relapse, nrm time is set to NA
+  
+  filtered_data$rel_time = as.integer(as.Date(filtered_data$tx_relapse_date) - 
+                                        as.Date(filtered_data$tp_hct_date))
+  
   
   # create different lists for plot func input based on selection  
   if (ci_type == "ANC engraftment") {
@@ -222,6 +205,16 @@ cum_param = function(ci_type, filtered_data) {
       surv_status = 'pt_status', 
       surv_time = 'os_time', 
       ci_type = ci_type, 
+      group_names = 'group'
+    )
+  } else if (ci_type == 'NRM') {
+    list(
+      subset_data = filtered_data, 
+      ci_status = 'nrm_status',
+      ci_time = 'nrm_time',
+      surv_status = 'tx_relapse', 
+      surv_time = 'rel_time', 
+      surv_type = ci_type, 
       group_names = 'group'
     )
   } 

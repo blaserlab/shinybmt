@@ -1,5 +1,6 @@
 #' @import ggplot2
 #' @import tidycmprsk
+#' @import dplyr
 #' @import tidyr
 #' @import survminer
 #' @import survival
@@ -21,7 +22,6 @@ shinyBMT <- function(data_dir, shiny_host = NULL, shiny_port = NULL) {
   
   # get the data dictionary
   dict = get_dict(dir = data_dir)
-  
   
   # manually select variables from dict to be incorporated in baseline selection
   # inputID1 - those are set
@@ -46,14 +46,14 @@ shinyBMT <- function(data_dir, shiny_host = NULL, shiny_port = NULL) {
   # manually select variables to be included in the baseline table
   tbl_variable_name = c('Age', 'Sex', 'Race', 'Diagnosis', 'Prep type', 'Donor type')
   # generate format list(new_Age ~ 'Age',...) for gtsummary
-  tbl_variable_list = setNames(tbl_variable_name, map_variable_name(tbl_variable_name))
+  tbl_variable_list = setNames(as.list(tbl_variable_name), map_variable_name(tbl_variable_name))
   
   # A selection of K-M functions
-  surv_selection = c('Please select...' = '', 'OS', 'RFS', 'GRFS', 'NRM', 'NRM_100')
-  cum_selection = c('Please select...' = '', 'ANC engraftment', 'Plt engraftment', 
+  surv_selection = c('Please select...' = '', 'OS', 'RFS', 'GRFS')
+  cum_selection = c('Please select...' = '', 'NRM', 'ANC engraftment', 'Plt engraftment', 
                     'G2-4 aGvHD', 'G3-4 aGvHD')
   # A selection of Cox-regression outcomes
-  cox_selection = c('Please select...' = '', 'OS', 'RFS', 'GRFS','G2-4 aGvHD', 'G3-4 aGvHD', 'NRM', 'NRM_100')
+  cox_selection = c('Please select...' = '', 'OS', 'RFS', 'GRFS', 'NRM', 'G2-4 aGvHD', 'G3-4 aGvHD')
   # A selection of Cox-regression covariates
   cox_covariates_names = c('Group', 'Age (>=65)', 'Sex', 'Race', 'Diagnosis', 
                            'Prep type', 'Donor type', 'Disease status', 'HCT-CI (>=3)')
@@ -135,7 +135,7 @@ shinyBMT <- function(data_dir, shiny_host = NULL, shiny_port = NULL) {
                         )
                  ),
                  div(style = "text-align: center; margin-top: 30px;",
-                     actionButton("gen_tbl", "Generate Baseline Table", 
+                     actionButton("gen_tbl", "Generate Study Cohorts", 
                                   class = 'btn-primary')),
                  column(6, 
                         div(class = "well", style = "margin-top: 20px;",
@@ -153,7 +153,9 @@ shinyBMT <- function(data_dir, shiny_host = NULL, shiny_port = NULL) {
                              choices = cum_selection,
                              selected = '')
                ),
-               mainPanel(plotOutput("KM_curves"))
+               mainPanel(
+                 plotOutput("KM_curves"),
+                 gt_output("summary_table"))
       ),
       tabPanel("Cox Regression",
                sidebarPanel(
@@ -192,19 +194,21 @@ shinyBMT <- function(data_dir, shiny_host = NULL, shiny_port = NULL) {
     
     # date selection synchronization
     # Error handling for transplant_date1
+    valid_date = reactiveVal(TRUE)
     observeEvent(input$transplant_date1, {
       date_range = input$transplant_date1
       if (date_range[2] <= date_range[1]) {
         showNotification(
           "Error: End date must be later than start date for Group 1",
           type = "error",
-          duration = NULL
         )
+        valid_date(FALSE)
       } else {
         # If the date range is valid, update transplant_date2
         updateDateRangeInput(session, "transplant_date2",
                              start = date_range[1],
                              end = date_range[2])
+        valid_date(TRUE)
       }
     }, ignoreInit = TRUE)
     
@@ -214,9 +218,11 @@ shinyBMT <- function(data_dir, shiny_host = NULL, shiny_port = NULL) {
       if (date_range[2] <= date_range[1]) {
         showNotification(
           "Error: End date must be later than start date for Group 2",
-          type = "error",
-          duration = NULL
+          type = "error"
         )
+        valid_date(FALSE)
+      } else {
+        valid_date(TRUE)
       }
     }, ignoreInit = TRUE)
     
@@ -305,17 +311,27 @@ shinyBMT <- function(data_dir, shiny_host = NULL, shiny_port = NULL) {
     
     # function button (gen_tbl) action
     reactive_filtered_data = reactiveVal()
+    no_duplicates = reactiveVal(TRUE)
+    
     observeEvent(input$gen_tbl, {
       
       save_inputs(row_count(), g1_inputs, g2_inputs, input) 
+      
+      # Check for duplicates in search_g1_* values
+      observe({
+        search_values = reactiveValuesToList(g1_inputs)[grep("^search_g1_", names(g1_inputs))]
+        search_values = search_values[search_values != ""]
+        
+        if (any(duplicated(search_values))) {
+          showNotification("There are duplicate criteria in search fields", type = "error")
+          no_duplicates(FALSE)
+        } else {
+          no_duplicates(TRUE)
+        }
+      })
+      
       transformed_g1 = transform_group_inputs(g1_inputs, 1, input_choices2)
       transformed_g2 = transform_group_inputs(g2_inputs, 2, input_choices2)
-
-      # Check for duplicates
-      if(any(duplicated(names(transformed_g1)))) {
-        showNotification("There are duplicate criteria", type = "error")
-        return()  # Exit the observe Event early if duplicates are found
-      }
       
       # Extract choices from set groups and
       # if 'Select...' (empty string) is chosen then replace with 'All'
@@ -360,7 +376,7 @@ shinyBMT <- function(data_dir, shiny_host = NULL, shiny_port = NULL) {
                     filtered_data %>% filter(group == input$g2_name))
       )
       
-      # error handling if no patients left
+      # error handling if 0 pt meets criteria
       if (nrow(filtered_data) == 0) {
         showNotification("No patients matches the selected criteria. Please adjust your selections.", 
                          type = "error")
@@ -370,16 +386,21 @@ shinyBMT <- function(data_dir, shiny_host = NULL, shiny_port = NULL) {
       }
     })
     
+    ## TABLE OUTPUT ##
     output$baseline_chrcs = render_gt({
-      # Only render the table if the reactive_filtered_data is not NULL
-      req(reactive_filtered_data())
+      # check error messages
+      if (!no_duplicates() || !valid_date() || is.null(reactive_filtered_data())) {
+        # Return an empty gt table if conditions are not met
+        return(gt::gt(data.frame()))
+      }
+      
       # create gt table
       reactive_filtered_data() %>% 
         select (map_variable_name(tbl_variable_name), 'group') %>%
         tbl_summary(
           by = 'group',
           missing_text = '(Missing)',
-          label = tbl_variable_list,
+          label = tbl_variable_list
         ) %>% add_p() %>% add_stat_label() %>%
         as_gt()
     })
@@ -429,6 +450,36 @@ shinyBMT <- function(data_dir, shiny_host = NULL, shiny_port = NULL) {
       }
     })
     
+    # summary table functions
+    output$summary_table = render_gt({
+      
+      filtered_data = reactive_filtered_data()
+      surv_params = surv_param(input$curve_type_surv, filtered_data)
+      cum_params = cum_param(input$curve_type_cum, filtered_data)
+      
+      if (input$curve_type_surv != '') {
+        # If the survival analysis dropdown is selected, plot survival data.
+        surv_table = surv_table_from_hct(
+          subset_data = surv_params$subset_data, 
+          surv_status = surv_params$surv_status, 
+          surv_time = surv_params$surv_time, 
+          surv_type = surv_params$surv_type, 
+          group_names = surv_params$group_names
+        )
+        surv_table %>% as_gt()
+      } else if (input$curve_type_cum == 'NRM') {
+        cum_table = ci_table_from_hct(
+          subset_data = cum_params$subset_data, 
+          ci_status = cum_params$ci_status,
+          ci_time = cum_params$ci_time,
+          surv_status = cum_params$surv_status, 
+          surv_time = cum_params$surv_time, 
+          ci_type = cum_params$ci_type, 
+          group_names = cum_params$group_names
+        )
+        cum_table %>% as_gt()
+      }
+    })
     
     ########## for cox-regression tab ##########
     # Define a reactive value to store the results
@@ -444,7 +495,7 @@ shinyBMT <- function(data_dir, shiny_host = NULL, shiny_port = NULL) {
       filtered_data = filter_hci_group(3, filtered_data)
       
       # Determine survival parameters
-      cox_params = if (input$cox_outcome_selection %in% c('OS', 'RFS', 'GRFS', 'NRM', 'NRM_100')) {
+      cox_params = if (input$cox_outcome_selection %in% c('OS', 'RFS', 'GRFS')) {
         surv_param(input$cox_outcome_selection, filtered_data)
       } else {
         cum_param(input$cox_outcome_selection, filtered_data)
@@ -479,8 +530,6 @@ shinyBMT <- function(data_dir, shiny_host = NULL, shiny_port = NULL) {
       cox_results() %>%
         as_gt() 
     })
-    
-
   }
   
   shinyApp(ui = ui, server = server)

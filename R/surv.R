@@ -1,6 +1,3 @@
-
-# survival function
-# surv_type = c('OS', 'PFS', 'GRFS', 'NRM', 'NRM_100')
 #' @import ggplot2
 #' @import tidycmprsk
 #' @import dplyr
@@ -8,6 +5,7 @@
 #' @import survminer
 #' @import survival
 #' @import gtsummary
+#' @import gt
 #' @import ggsurvfit
 #' @import ggsci
 
@@ -50,61 +48,51 @@ surv_from_hct = function(subset_data, surv_status, surv_time,
                         label = sprintf("HR %.2f, 95%%CI %.2f to %.2f", 
                                         surv_hr, surv_ci_lower, surv_ci_upper),
                         size = 5)
-    return(surv_plot)
-  } else if (surv_type =='NRM') {
-    surv_plot = ggsurvplot(surv_model, data=subset_data,
-                           title = sprintf("%s", surv_type),
-                           palette = "npg", censor = T,
-                           fun = "cumhaz",
-                           conf.int = T, conf.int.alpha = 0.2,
-                           ylim = c(0, 1), 
-                           xlim = c(0,max_time + 50),
-                           break.x.by = round(max_time / 100) * 10,
-                           xlab = "Time since transplant (days)",
-                           ylab = sprintf("%s probability", surv_type),
-                           legend = 'bottom',
-                           risk.table = T,
-                           risk.table.col = "strata",
-                           tables.theme = theme_void(),
-                           pval = T)
-    surv_plot$plot = surv_plot$plot + theme(legend.title=element_blank()) +
-      ggplot2::annotate("text", hjust = 1, x = max_time, y = 0.1,
-                        label = sprintf("HR %.2f, 95%%CI %.2f to %.2f", 
-                                        surv_hr, surv_ci_lower, surv_ci_upper),
-                        size = 5)
-    return(surv_plot)
-  } else if (surv_type =='NRM_100') {
-    surv_plot = ggsurvplot(surv_model, data=subset_data,
-                           title = sprintf("%s", surv_type),
-                           palette = "npg", censor = T,
-                           fun = "cumhaz",
-                           conf.int = T, conf.int.alpha = 0.2,
-                           ylim = c(0, 1), 
-                           xlim = c(0,105),
-                           break.x.by = 20,
-                           xlab = "Time since transplant (days)",
-                           ylab = sprintf("%s probability", surv_type),
-                           legend = 'bottom',
-                           risk.table = T,
-                           risk.table.col = "strata",
-                           tables.theme = theme_void(),
-                           pval = T)
-    surv_plot$plot = surv_plot$plot + theme(legend.title=element_blank()) +
-      ggplot2::annotate("text", hjust = 0, x = 60, y = 0.1,
-                        label = sprintf("HR %.2f, 95%%CI %.2f to %.2f", 
-                                        surv_hr, surv_ci_lower, surv_ci_upper),
-                        size = 5)
-    return(surv_plot)
-  }
-  
+
+  } 
+  return(surv_plot)
   
 }
 
-
+# survival summary table function ('OS', 'RFS', 'GRFS')
+#' @import survival
+#' @import dplyr
+#' @import gt
+#' @import gtsummary
+surv_table_from_hct = function(subset_data, surv_status, surv_time, 
+                               group_names, surv_type) {
+  
+  # surv_status, surv_time, group_names are symbols 
+  formula_str = sprintf("Surv(%s, %s) ~ %s", surv_time, surv_status, group_names)
+  surv_formula = as.formula(formula_str)
+  surv_model = surv_fit(surv_formula, data = subset_data)
+  
+  # draw CI plot for NRM, and survival plot for the rest
+  if (surv_type %in% c('OS', 'RFS', 'GRFS')) {
+    surv_table_1 = tbl_survfit(
+      surv_model,
+      times = c(365, 730, 1825),
+      label_header = "**{time/365}-yr est, %(95%CI)**"
+    )
+    surv_table_2 = tbl_survfit(
+      surv_model,
+      probs = 0.5,
+      label_header = paste0("**Median, days(95%CI)**")
+    )
+    surv_table = tbl_merge(
+      tbls = list(surv_table_1, surv_table_2),
+      tab_spanner = FALSE
+    ) %>%
+      modify_header(label ~ paste0("**", surv_type, "**"))
+    
+  } 
+  return(surv_table)
+}
 
 # cumulative incidence (ci) function
-# Fine-Gray competing risk model, treating death as a competing risk
-# ci_type = c('ANC engraftment', 'Plt engraftment', 'G2-4 aGvHD', 'G3-4 aGvHD')
+# Fine-Gray competing risk model, treating death as a competing risk for engraftment and GVHD
+# treating relapse as a competing risk for NRM
+# ci_type = c('NRM', 'ANC engraftment', 'Plt engraftment', 'G2-4 aGvHD', 'G3-4 aGvHD')
 #' @import ggplot2
 #' @import tidycmprsk
 #' @import dplyr
@@ -116,18 +104,19 @@ surv_from_hct = function(subset_data, surv_status, surv_time,
 #' @import ggsci
 ci_from_hct = function(subset_data, ci_status, ci_time, surv_status, surv_time,
                        group_names, ci_type) {
-
-  # define time and status for competing risk analysis by
-  # combining cumulative incidence and overall survival
+  
+  # remove inconsistencies in data
   subset_data = subset_data %>%
     dplyr::filter(!( .data[[ci_status]] == 1 & is.na(.data[[ci_time]]))) %>%
-    dplyr::filter(.data[[ci_status]] != 0 | is.na(.data[[ci_time]]))
-
+    dplyr::filter(.data[[ci_status]] != 0 | is.na(.data[[ci_time]])) 
+  
+  # define time and status for competing risk analysis by
+  # combining cumulative incidence and overall survival
   subset_data$cmprsk_time = ifelse(is.na(subset_data[[ci_time]]), 
                                    subset_data[[surv_time]], 
                                    subset_data[[ci_time]])
 
-  # status: 0=censor, 1=event(e.g. engraftment), 2=death
+  # status: 0=censor, 1=event(e.g. engraftment), 2=death (or relapse for NRM)
   subset_data$cmprsk_status = ifelse(subset_data[[ci_status]] == 1, 
                                      1, 
                                      ifelse(subset_data[[surv_status]] == 1, 
@@ -169,4 +158,50 @@ ci_from_hct = function(subset_data, ci_status, ci_time, surv_status, surv_time,
               size = 4.5)
 
   return(ci_plot)
+}
+
+
+# survival summary table function for NRM
+#' @import survival
+#' @import dplyr
+#' @import gt
+#' @import gtsummary
+#' @import tidycmprsk
+ci_table_from_hct = function(subset_data, ci_status, ci_time, surv_status, surv_time,
+                             group_names, ci_type) {
+  
+  # remove inconsistencies in data
+  subset_data = subset_data %>%
+    dplyr::filter(!( .data[[ci_status]] == 1 & is.na(.data[[ci_time]]))) %>%
+    dplyr::filter(.data[[ci_status]] != 0 | is.na(.data[[ci_time]])) 
+  
+  # define time and status for competing risk analysis by
+  # combining cumulative incidence and overall survival
+  subset_data$cmprsk_time = ifelse(is.na(subset_data[[ci_time]]), 
+                                   subset_data[[surv_time]], 
+                                   subset_data[[ci_time]])
+  
+  # status: 0=censor, 1=event(e.g. engraftment), 2=death (or relapse for NRM)
+  subset_data$cmprsk_status = ifelse(subset_data[[ci_status]] == 1, 
+                                     1, 
+                                     ifelse(subset_data[[surv_status]] == 1, 
+                                            2, 0))
+  subset_data$cmprsk_status = as.factor(subset_data$cmprsk_status)
+  
+  # Correctly constructing the model formula using the 'group_names' variable
+  time_status_formula = reformulate(termlabels = group_names, 
+                                    response = 'Surv(cmprsk_time, cmprsk_status)')
+  
+  # Creating models
+  ci_model = cuminc(time_status_formula, data = subset_data)
+  
+  cum_table = tbl_cuminc( #tbl_cuminc function from tidycmprsk
+    ci_model,
+    times = c(30, 100, 365),
+    label_header = "**{time}-day NRM, %(95%CI)**"
+  ) %>%
+    modify_header(label ~ "**Group**")
+  
+  
+  return(cum_table)
 }

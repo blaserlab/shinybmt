@@ -101,7 +101,7 @@ multi_log = function (event, event_name, variables, data) {
 }
 
 
-# Blow is modified from "ddsjoberg/bstfun/add_inline_forest_plot()"
+# Blow is modified from "ddsjoberg/bstfun/add_inline_forest_plot()" to adde forest plot
 #' @import dplyr
 #' @import tidyr
 #' @import gtsummary
@@ -128,7 +128,7 @@ add_inline_forest_plot <- function(x, header = "**Forest Plot**",
   # add column with forest plot ------------------------------------------------
   # prepping arguments for `kableExtra::spec_pointrange()`
   spec_pointrange.args <-
-    list(vline = vline, width = 600, cex = .8, col = "black", pch = 16) %>%
+    list(vline = vline, width = 600, cex = .8, col = "black", pch = 16) %>%  # change here to modify size of forest plot
     purrr::list_modify(!!!spec_pointrange.args) %>%
     purrr::list_modify(
       x = ifelse(scale_fun(x$table_body$conf.low) > 10, 10, scale_fun(x$table_body$estimate)),

@@ -94,27 +94,22 @@ restore_inputs = function(input_choices, row_count, g1_inputs, g2_inputs, sessio
 # transform g1_inputs and g2_inputs into a list format
 # from (search_g1_1='variable_display', value_g1_1='a', ) to list ('variable_display' = 'a', '' = '', ), 
 # then to ('inputId' = 'a', '' = '', )
-transform_group_inputs <- function(group_inputs, group_number, input_choices) {
-  result <- list()
-  
-  # Validate group_number
-  if (!group_number %in% c(1, 2)) {
-    stop("group_number must be either 1 or 2")
-  }
+transform_group_inputs = function(group_inputs, group_number, input_choices) {
+  result = list()
   
   # Create the search prefix based on group number
-  search_prefix <- paste0("search_g", group_number, "_")
-  value_prefix <- paste0("value_g", group_number, "_")
+  search_prefix = paste0("search_g", group_number, "_")
+  value_prefix = paste0("value_g", group_number, "_")
   
   # Get all the search keys
-  search_keys <- names(group_inputs)[grep(paste0("^", search_prefix), names(group_inputs))]
+  search_keys = names(group_inputs)[grep(paste0("^", search_prefix), names(group_inputs))]
   
   for (key in search_keys) {
     # Extract the index
-    index <- sub(search_prefix, "", key)
+    index = sub(search_prefix, "", key)
     
     # Get the corresponding value key
-    value_key <- paste0(value_prefix, index)
+    value_key = paste0(value_prefix, index)
     
     # Get the search criterion and its corresponding values
     criterion <- group_inputs[[key]]
@@ -125,10 +120,7 @@ transform_group_inputs <- function(group_inputs, group_number, input_choices) {
       values = "All"
     }
     
-    # Add to the result list, but only if values are not empty
-    if (length(values) > 0 && !all(values == "")) {
-      result[[criterion]] <- values
-    }
+    result[[criterion]] = values
   }
   
   # mapping from list ('variable_display' = 'a', ) to ('inputId' = 'a', )
