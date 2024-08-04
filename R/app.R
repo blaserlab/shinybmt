@@ -28,16 +28,16 @@ shinyBMT <- function(data_dir, shiny_host = NULL, shiny_port = NULL) {
   # inputID2 - those are dynamic and can be searched and added
   inputId1 = c(
     'dx',
-    'tp_prep_class',
-    'tp_donor1_type'
+    'tx_type',
+    'donor',
+    'gvhdpr'
   )
   
   inputId2 = c(
-    'tp_gvhd_prophy_csa_yn',
-    'tp_gvhd_prophy_fk506_yn',
-    'tp_gvhd_prophy_mmf_yn',
-    'tp_gvhd_prophy_mtx_yn',
-    'tp_gvhd_prophy_csa_yn'
+    'RemSta',
+    'doncmv',
+    'aborh',
+    "Crd", "CVD", "DM", "HVD", "Hpm", "Hps", "Ifc", "IBD", "Obs", "Pep", "Psy", "Plm", "Pls", "Ren", "Rhe", "SoT"
   )
 
   input_choices1 = select_input_choices(inputId1, dict)
@@ -356,8 +356,8 @@ shinyBMT <- function(data_dir, shiny_host = NULL, shiny_port = NULL) {
       # filter data
       filtered_data = filter_data(age_range_1 = input$age_range1,
                                   age_range_2 = input$age_range2,
-                                  dob = 'pt_dob',
-                                  doe = 'tp_hct_date',
+                                  dob = 'dob',
+                                  doe = 'bmt_date',
                                   list_choice_1 = c(selections_group1, transformed_g1), 
                                   list_choice_2 = c(selections_group2, transformed_g2), 
                                   group_name_1 = input$g1_name, 
@@ -368,11 +368,11 @@ shinyBMT <- function(data_dir, shiny_host = NULL, shiny_port = NULL) {
       filtered_data = rbind(
         filter_date(input$transplant_date1[1], 
                     input$transplant_date1[2], 
-                    'tp_hct_date', 
+                    'bmt_date', 
                     filtered_data %>% filter(group == input$g1_name)),
         filter_date(input$transplant_date2[1], 
                     input$transplant_date2[2], 
-                    'tp_hct_date',  
+                    'bmt_date',  
                     filtered_data %>% filter(group == input$g2_name))
       )
       
@@ -467,7 +467,7 @@ shinyBMT <- function(data_dir, shiny_host = NULL, shiny_port = NULL) {
           group_names = surv_params$group_names
         )
         surv_table %>% as_gt()
-      } else if (input$curve_type_cum == 'NRM') {
+      } else if (input$curve_type_cum %in% c('NRM', 'G2-4 aGvHD', 'G3-4 aGvHD')) {
         cum_table = ci_table_from_hct(
           subset_data = cum_params$subset_data, 
           ci_status = cum_params$ci_status,
@@ -491,7 +491,7 @@ shinyBMT <- function(data_dir, shiny_host = NULL, shiny_port = NULL) {
       
       # Apply age group and HCI group filters
       filtered_data = reactive_filtered_data()
-      filtered_data = filter_age_group(65, dob='pt_dob', doe='tp_hct_date', data=filtered_data)
+      filtered_data = filter_age_group(65, dob='dob', doe='bmt_date', data=filtered_data)
       filtered_data = filter_hci_group(3, filtered_data)
       
       # Determine survival parameters

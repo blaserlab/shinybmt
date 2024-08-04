@@ -8,23 +8,23 @@
 #' @import survival
 
 get_bmtdata <- function(dir) {
-  bmtdata = read_excel(fs::path(dir, 'bmtdata.xlsx'))
+  bmtdata = read_excel(fs::path(dir, 'Wang_20240726_modified.xlsx'))
   
 }
 
 # surv_selection = c('Please select...' = '', 'OS', 'RFS', 'GRFS')
 # In this dataset
-# 20: pt_status: did the pt die, c(1,0)
-# 19: last_fu: data of last follow up or death, YYYY-MM-DD
-# 751: tp_hct_date: Date of HCT: YYYY-MM-DD
+# 20: pt_status: did the pt die, c(1,0) -> alive
+# 19: last_fu: data of last follow up or death, YYYY-MM-DD ->LastUpdate
+# 751: tp_hct_date: Date of HCT: YYYY-MM-DD -> bmt_date
 
-# 736: tx_relapse: did the pt relapse, c(1,0)
-# 738: tx_relapse_date: date of relaspe after this line of therapy, YYYY-MM-DD
+# 736: tx_relapse: did the pt relapse, c(1,0) -> rlap
+# 738: tx_relapse_date: date of relaspe after this line of therapy, YYYY-MM-DD ->rl_date
 
-# 1388: ptp_agvhd_max_grade: max overall grade of acute GVHD
-# 1389: ptp_agvhd_max_grade_date: Date of maximum overall grade of acute GVHD
-# 1539: ptp_cgvhd_tx_syst_yn: Was systemic therapy given to treat chronic GVHD?
-# 1541: ptp_cgvhd_tx_syst_date: Date Therapy was started for Chronic GVHD
+# 1388: ptp_agvhd_max_grade: max overall grade of acute GVHD ->MaxAgvhd
+# 1389: ptp_agvhd_max_grade_date: Date of maximum overall grade of acute GVHD ->DateMaxAGVHD
+# 1539: ptp_cgvhd_tx_syst_yn: Was systemic therapy given to treat chronic GVHD? ->MaxExtentCGVHD
+# 1541: ptp_cgvhd_tx_syst_date: Date Therapy was started for Chronic GVHD -> DateOnsetCGVHD
 
 
 # Define the function to calculate GRFS status and GRFS time
@@ -38,10 +38,10 @@ calculate_grfs <- function(data) {
     grfs <- rep(0, nrow(data))
     
     # Set GRFS status to 1 if any of the following conditions occur
-    grfs[pt_status == 1] <- 1  # Patient died
-    grfs[!is.na(tx_relapse_date) & tx_relapse == 1] <- 1  # Patient relapsed
-    grfs[ptp_agvhd_max_grade >= 3 & !is.na(ptp_agvhd_max_grade_date)] <- 1  # Severe acute GVHD
-    grfs[ptp_cgvhd_tx_syst_yn == 1 & !is.na(ptp_cgvhd_tx_syst_date)] <- 1  # Systemic therapy for chronic GVHD
+    grfs[alive == 1] <- 1  # Patient died
+    grfs[!is.na(rl_date) & rlap == 1] <- 1  # Patient relapsed
+    grfs[MaxAgvhd >= 3 & !is.na(DateMaxAGVHD)] <- 1  # Severe acute GVHD
+    grfs[MaxExtentCGVHD == 1 & !is.na(DateOnsetCGVHD)] <- 1  # Systemic therapy for chronic GVHD
     
     # Return the GRFS status
     grfs
@@ -50,12 +50,12 @@ calculate_grfs <- function(data) {
   # Calculate GRFS time 
   data$grfs_time <- with(data, {
     # Determine the earliest date of GRFS-defining event
-    event_date <- pmin(last_fu,
-                       ifelse(!is.na(tx_relapse_date) & tx_relapse == 1, tx_relapse_date, last_fu),
-                       ifelse(ptp_agvhd_max_grade >= 3, ptp_agvhd_max_grade_date, last_fu),
-                       ifelse(ptp_cgvhd_tx_syst_yn == 1, ptp_cgvhd_tx_syst_date, last_fu),
+    event_date <- pmin(LastUpdate,
+                       ifelse(!is.na(rl_date) & rlap == 1, rl_date, LastUpdate),
+                       ifelse(MaxAgvhd >= 3, DateMaxAGVHD, LastUpdate),
+                       ifelse(MaxExtentCGVHD == 1, DateOnsetCGVHD, LastUpdate),
                        na.rm = TRUE)
-    as.integer(as.Date(event_date) - as.Date(tp_hct_date))
+    as.integer(as.Date(event_date) - as.Date(bmt_date))
   })
   return(data)
 }
@@ -67,15 +67,15 @@ calculate_grfs <- function(data) {
 surv_param = function(surv_type, filtered_data) {
   
   # define and adds new variables from source dataset
-  filtered_data$os_time = as.integer(as.Date(filtered_data$last_fu) - 
-                                       as.Date(filtered_data$tp_hct_date))
+  filtered_data$os_time = as.integer(as.Date(filtered_data$LastUpdate) - 
+                                       as.Date(filtered_data$bmt_date))
   
-  filtered_data$rfs_status = ifelse(filtered_data$pt_status==1 | filtered_data$tx_relapse==1,
+  filtered_data$rfs_status = ifelse(filtered_data$alive==1 | filtered_data$rlap==1,
                                     1, 0)
   filtered_data$rfs_time = with(filtered_data, {
-    days_to_last_fu = as.integer(as.Date(last_fu) - as.Date(tp_hct_date))
-    days_to_relapse = as.integer(as.Date(tx_relapse_date) - as.Date(tp_hct_date))
-    pmin(days_to_last_fu, days_to_relapse, na.rm = TRUE)
+    days_to_LastUpdate = as.integer(as.Date(LastUpdate) - as.Date(bmt_date))
+    days_to_relapse = as.integer(as.Date(rl_date) - as.Date(bmt_date))
+    pmin(days_to_LastUpdate, days_to_relapse, na.rm = TRUE)
   })
   
   filtered_data = calculate_grfs(filtered_data)
@@ -85,7 +85,7 @@ surv_param = function(surv_type, filtered_data) {
   if (surv_type == "OS") {
     list(
       subset_data = filtered_data, 
-      surv_status = 'pt_status', 
+      surv_status = 'alive', 
       surv_time = 'os_time', 
       surv_type = surv_type, 
       group_names = 'group'
@@ -114,9 +114,9 @@ surv_param = function(surv_type, filtered_data) {
 #                   'G2-4 aGvHD', 'G3-4 aGvHD')
 
 # In this dataset
-# 20: pt_status: did the pt die, c(1,0)
-# 19: last_fu: data of last follow up or death, YYYY-MM-DD
-# 751: tp_hct_date: Date of HCT: YYYY-MM-DD
+# 20: pt_status: did the pt die, c(1,0) ->alive
+# 19: last_fu: data of last follow up or death, YYYY-MM-DD ->LastUpdate
+# 751: tp_hct_date: Date of HCT: YYYY-MM-DD ->bmt_date
 
 # 1160: ptp_g_drop_recov_yn:Did the patient recover and maintain ANC ? 500/mm3
 # 1161: ptp_g_drop_recov_date: Date of ANC recovery
@@ -131,39 +131,26 @@ surv_param = function(surv_type, filtered_data) {
 cum_param = function(ci_type, filtered_data) {
   
   # define variables from source dataset
-  filtered_data$os_time = as.integer(as.Date(filtered_data$last_fu) - 
-                                       as.Date(filtered_data$tp_hct_date))
+  filtered_data$os_time = as.integer(as.Date(filtered_data$LastUpdate) - 
+                                       as.Date(filtered_data$bmt_date))
   filtered_data$anc_engraftment_time = as.integer(as.Date(filtered_data$ptp_g_drop_recov_date) - 
-                                                    as.Date(filtered_data$tp_hct_date))
+                                                    as.Date(filtered_data$bmt_date))
   filtered_data$plt_engraftment_time = as.integer(as.Date(filtered_data$ptp_plt20_date) - 
-                                                    as.Date(filtered_data$tp_hct_date))
-  filtered_data$g2_4_gvhd_status = ifelse (filtered_data$ptp_agvhd_max_grade>1, 1, 0)
-  filtered_data$g2_4_gvhd_time = ifelse (filtered_data$ptp_agvhd_max_grade>1, 
-                                         as.integer(as.Date(filtered_data$ptp_agvhd_max_grade_date) - 
-                                                      as.Date(filtered_data$tp_hct_date)), 
+                                                    as.Date(filtered_data$bmt_date))
+  filtered_data$g2_4_gvhd_status = ifelse (filtered_data$MaxAgvhd>1, 1, 0)
+  filtered_data$g2_4_gvhd_time = ifelse (filtered_data$MaxAgvhd>1, 
+                                         as.integer(as.Date(filtered_data$DateMaxAGVHD) - 
+                                                      as.Date(filtered_data$bmt_date)), 
                                          NA)
-  filtered_data$g3_4_gvhd_status = ifelse (filtered_data$ptp_agvhd_max_grade>2, 1, 0)
-  filtered_data$g3_4_gvhd_time = ifelse (filtered_data$ptp_agvhd_max_grade>2, 
-                                         as.integer(as.Date(filtered_data$ptp_agvhd_max_grade_date) - 
-                                                      as.Date(filtered_data$tp_hct_date)), 
+  filtered_data$g3_4_gvhd_status = ifelse (filtered_data$MaxAgvhd>2, 1, 0)
+  filtered_data$g3_4_gvhd_time = ifelse (filtered_data$MaxAgvhd>2, 
+                                         as.integer(as.Date(filtered_data$DateMaxAGVHD) - 
+                                                      as.Date(filtered_data$bmt_date)), 
                                          NA)
+
   
-  filtered_data$nrm_status = with(filtered_data, {
-    case_when(
-      pt_status == 1 & tx_relapse == 0  ~ 1,  # NRM -1
-      tx_relapse == 1  ~ 2,                   # Relapse -2
-      TRUE ~ 0                                # Censored -0
-    )
-  })
-  
-  filtered_data$nrm_time = with(filtered_data, {
-    days_to_death = as.integer(as.Date(last_fu) - as.Date(tp_hct_date))
-    days_to_relapse = as.integer(as.Date(tx_relapse_date) - as.Date(tp_hct_date))
-    ifelse(nrm_status == 1, days_to_death, NA)
-  }) # if pt did not die or die d/t relapse, nrm time is set to NA
-  
-  filtered_data$rel_time = as.integer(as.Date(filtered_data$tx_relapse_date) - 
-                                        as.Date(filtered_data$tp_hct_date))
+  filtered_data$rel_time = as.integer(as.Date(filtered_data$rl_date) - 
+                                        as.Date(filtered_data$bmt_date))
   
   
   # create different lists for plot func input based on selection  
@@ -172,7 +159,7 @@ cum_param = function(ci_type, filtered_data) {
       subset_data = filtered_data, 
       ci_status = 'ptp_g_drop_recov_yn',
       ci_time = 'anc_engraftment_time',
-      surv_status = 'pt_status', 
+      surv_status = 'alive', 
       surv_time = 'os_time', 
       ci_type = ci_type, 
       group_names = 'group'
@@ -182,7 +169,7 @@ cum_param = function(ci_type, filtered_data) {
       subset_data = filtered_data, 
       ci_status = 'ptp_plt20_yn',
       ci_time = 'plt_engraftment_time',
-      surv_status = 'pt_status', 
+      surv_status = 'alive', 
       surv_time = 'os_time', 
       ci_type = ci_type, 
       group_names = 'group'
@@ -192,7 +179,7 @@ cum_param = function(ci_type, filtered_data) {
       subset_data = filtered_data, 
       ci_status = 'g2_4_gvhd_status',
       ci_time = 'g2_4_gvhd_time',
-      surv_status = 'pt_status', 
+      surv_status = 'alive', 
       surv_time = 'os_time', 
       ci_type = ci_type, 
       group_names = 'group'
@@ -202,7 +189,7 @@ cum_param = function(ci_type, filtered_data) {
       subset_data = filtered_data, 
       ci_status = 'g3_4_gvhd_status',
       ci_time = 'g3_4_gvhd_time',
-      surv_status = 'pt_status', 
+      surv_status = 'alive', 
       surv_time = 'os_time', 
       ci_type = ci_type, 
       group_names = 'group'
@@ -210,11 +197,11 @@ cum_param = function(ci_type, filtered_data) {
   } else if (ci_type == 'NRM') {
     list(
       subset_data = filtered_data, 
-      ci_status = 'nrm_status',
-      ci_time = 'nrm_time',
-      surv_status = 'tx_relapse', 
+      ci_status = 'alive',
+      ci_time = 'os_time',
+      surv_status = 'rlap', 
       surv_time = 'rel_time', 
-      surv_type = ci_type, 
+      ci_type = ci_type, 
       group_names = 'group'
     )
   } 
@@ -230,12 +217,12 @@ map_variable_name = function(input) {
   # Define the mapping between the inputs and the corresponding tbl_variable items
   mapping = list(
     'Age' = 'new_age',
-    'Sex' = 'pt_sex',
-    'Race' = 'pt_race',
+    'Sex' = 'Gn',
+    'Race' = 'race',
     'Diagnosis' = 'dx',
-    'Prep type' = 'tp_prep_class',
-    'Donor type' = 'tp_donor1_type',
-    'Disease status' = 'tx_dz_status',
+    'Prep type' = 'tx_type',
+    'Donor type' = 'donor',
+    'Disease status' = 'RemSta',
     'Age (>=65)' = 'age_group_65',
     'HCT-CI (>=3)' = 'hct_ci_3',
     'Group' = 'group'

@@ -128,13 +128,20 @@ add_inline_forest_plot <- function(x, header = "**Forest Plot**",
   # add column with forest plot ------------------------------------------------
   # prepping arguments for `kableExtra::spec_pointrange()`
   spec_pointrange.args <-
-    list(vline = vline, width = 600, cex = .8, col = "black", pch = 16) %>%  # change here to modify size of forest plot
+    list(vline = vline, width = 600, cex = .8, col = "black", pch = 16) %>% # adjust here for forest plot size
     purrr::list_modify(!!!spec_pointrange.args) %>%
     purrr::list_modify(
-      x = ifelse(scale_fun(x$table_body$conf.low) > 10, 10, scale_fun(x$table_body$estimate)),
-      xmin = ifelse(scale_fun(x$table_body$conf.low) > 10, 10, scale_fun(x$table_body$conf.low)),
-      xmax = ifelse(scale_fun(x$table_body$conf.low) > 10, 10, pmin(scale_fun(x$table_body$conf.high), 10))
+      x = ifelse(is.finite(scale_fun(x$table_body$estimate)),
+                 ifelse(scale_fun(x$table_body$conf.low) > 10, 10, scale_fun(x$table_body$estimate)),
+                 NA),
+      xmin = ifelse(is.finite(scale_fun(x$table_body$conf.low)),
+                    ifelse(scale_fun(x$table_body$conf.low) > 10, 10, scale_fun(x$table_body$conf.low)),
+                    NA),
+      xmax = ifelse(is.finite(scale_fun(x$table_body$conf.high)),
+                    ifelse(scale_fun(x$table_body$conf.low) > 10, 10, pmin(scale_fun(x$table_body$conf.high), 10)),
+                    NA)
     ) # max out at 10
+  
   
   x <-
     gtsummary::modify_table_body(

@@ -107,8 +107,7 @@ ci_from_hct = function(subset_data, ci_status, ci_time, surv_status, surv_time,
   
   # remove inconsistencies in data
   subset_data = subset_data %>%
-    dplyr::filter(!( .data[[ci_status]] == 1 & is.na(.data[[ci_time]]))) %>%
-    dplyr::filter(.data[[ci_status]] != 0 | is.na(.data[[ci_time]])) 
+    filter(!( .data[[ci_status]] == 1 & is.na(.data[[ci_time]])))
   
   # define time and status for competing risk analysis by
   # combining cumulative incidence and overall survival
@@ -117,11 +116,24 @@ ci_from_hct = function(subset_data, ci_status, ci_time, surv_status, surv_time,
                                    subset_data[[ci_time]])
 
   # status: 0=censor, 1=event(e.g. engraftment), 2=death (or relapse for NRM)
-  subset_data$cmprsk_status = ifelse(subset_data[[ci_status]] == 1, 
-                                     1, 
-                                     ifelse(subset_data[[surv_status]] == 1, 
-                                            2, 0))
+  if (ci_type == "NRM") {
+    subset_data$cmprsk_status = case_when(
+      subset_data[[ci_status]] == 1 & subset_data[[surv_status]] == 0 ~ 1,  # NRM event
+      subset_data[[surv_status]] == 1 ~ 2,  # Competing event (relapse)
+      TRUE ~ 0  # Censored
+    )
+  } else if (ci_type %in% c('ANC engraftment', 'Plt engraftment', 'G2-4 aGvHD', 'G3-4 aGvHD')) {
+    subset_data$cmprsk_status = case_when(
+      subset_data[[ci_status]] == 1 ~ 1,  # Engraftment/GVHD event
+      subset_data[[surv_status]] == 1 ~ 2,  # Competing event (death)
+      TRUE ~ 0  # Censored
+    )
+  }
+    
   subset_data$cmprsk_status = as.factor(subset_data$cmprsk_status)
+  
+  subset_data = subset_data %>%
+    dplyr::filter(!is.na(cmprsk_time), !is.na(cmprsk_status), !is.na(.data[[group_names]]))
   
   # Correctly constructing the model formula using the 'group_names' variable
   time_status_formula = reformulate(termlabels = group_names, 
@@ -131,6 +143,7 @@ ci_from_hct = function(subset_data, ci_status, ci_time, surv_status, surv_time,
   ci_model = cuminc(time_status_formula, data = subset_data)
   ci_cox = crr(time_status_formula, data = subset_data)
   tbl = gtsummary::tbl_regression(ci_cox, exponentiate = TRUE)
+  max_time = max(subset_data[[ci_time]], na.rm = TRUE)
 
   # Extracting inline text for annotation
   # Level is set to the 2nd element (ie group2 vs group1) - if >2 groups, need update
@@ -146,14 +159,15 @@ ci_from_hct = function(subset_data, ci_status, ci_time, surv_status, surv_time,
     labs(y = "Cumulative Incidence",
          title = sprintf("%s", ci_type),
          x = "Time since transplant (days)") +
-    coord_cartesian(ylim = c(0, 1)) + 
+    coord_cartesian(ylim = c(0, 1),
+                    xlim = c(0,max_time + 10),) + 
     theme(legend.position = "bottom",
           text = element_text(size = 14)) +
     add_confidence_interval() +
     add_risktable(size = 4) +
     scale_ggsurvfit() +
-    annotate ("text", hjust = 1, x = max(subset_data$cmprsk_time, na.rm=T),
-              y = 0.1,
+    annotate ("text", hjust = 0, x = 0,
+              y = 0.6,
               label = paste('HR', annotate_text),
               size = 4.5)
 
@@ -172,8 +186,7 @@ ci_table_from_hct = function(subset_data, ci_status, ci_time, surv_status, surv_
   
   # remove inconsistencies in data
   subset_data = subset_data %>%
-    dplyr::filter(!( .data[[ci_status]] == 1 & is.na(.data[[ci_time]]))) %>%
-    dplyr::filter(.data[[ci_status]] != 0 | is.na(.data[[ci_time]])) 
+    filter(!( .data[[ci_status]] == 1 & is.na(.data[[ci_time]])))
   
   # define time and status for competing risk analysis by
   # combining cumulative incidence and overall survival
@@ -182,10 +195,20 @@ ci_table_from_hct = function(subset_data, ci_status, ci_time, surv_status, surv_
                                    subset_data[[ci_time]])
   
   # status: 0=censor, 1=event(e.g. engraftment), 2=death (or relapse for NRM)
-  subset_data$cmprsk_status = ifelse(subset_data[[ci_status]] == 1, 
-                                     1, 
-                                     ifelse(subset_data[[surv_status]] == 1, 
-                                            2, 0))
+  if (ci_type == "NRM") {
+    subset_data$cmprsk_status = case_when(
+      subset_data[[ci_status]] == 1 & subset_data[[surv_status]] == 0 ~ 1,  # NRM event
+      subset_data[[surv_status]] == 1 ~ 2,  # Competing event (relapse)
+      TRUE ~ 0  # Censored
+    )
+  } else if (ci_type %in% c('ANC engraftment', 'Plt engraftment', 'G2-4 aGvHD', 'G3-4 aGvHD')) {
+    subset_data$cmprsk_status = case_when(
+      subset_data[[ci_status]] == 1 ~ 1,  # Engraftment/GVHD event
+      subset_data[[surv_status]] == 1 ~ 2,  # Competing event (death)
+      TRUE ~ 0  # Censored
+    )
+  }
+  
   subset_data$cmprsk_status = as.factor(subset_data$cmprsk_status)
   
   # Correctly constructing the model formula using the 'group_names' variable
@@ -195,13 +218,21 @@ ci_table_from_hct = function(subset_data, ci_status, ci_time, surv_status, surv_
   # Creating models
   ci_model = cuminc(time_status_formula, data = subset_data)
   
-  cum_table = tbl_cuminc( #tbl_cuminc function from tidycmprsk
-    ci_model,
-    times = c(30, 100, 365),
-    label_header = "**{time}-day NRM, %(95%CI)**"
-  ) %>%
-    modify_header(label ~ "**Group**")
-  
+  if (ci_type %in% c('G2-4 aGvHD', 'G3-4 aGvHD')) {
+    cum_table = tbl_cuminc( #tbl_cuminc function from tidycmprsk
+      ci_model,
+      times = c(60, 100, 150),
+      label_header = "**{time}-day aGvHD, %(95%CI)**"
+    ) %>%
+      modify_header(label ~ "**Group**")
+  } else if (ci_type == 'NRM') {
+    cum_table = tbl_cuminc( #tbl_cuminc function from tidycmprsk
+      ci_model,
+      times = c(30, 100, 365),
+      label_header = "**{time}-day NRM, %(95%CI)**"
+    ) %>%
+      modify_header(label ~ "**Group**")
+  }
   
   return(cum_table)
 }
