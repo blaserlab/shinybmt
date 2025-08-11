@@ -11,8 +11,32 @@
 #' @import readxl
 #' @import shinyWidgets
 #' @import shiny
+#' @import shinymanager
+#' @import keyring
 #' @import kableExtra
 #' @export
+
+library(ggplot2)
+library(tidycmprsk)
+library(dplyr)
+library(tidyr)
+library(survminer)
+library(survival)
+library(gtsummary)
+library(gt)
+library(ggsurvfit)
+library(ggsci)
+library(readxl)
+library(shinyWidgets)
+library(shiny)
+library(kableExtra)
+library(shinymanager)
+library(keyring)
+
+
+app_dir <- "/workspace/jason_workspace/shinybmt"
+www_dir <- file.path(app_dir, "www")  
+shiny::addResourcePath("static", www_dir) 
 
 
 shinyBMT <- function(data_dir, shiny_host = NULL, shiny_port = NULL) {
@@ -29,22 +53,32 @@ shinyBMT <- function(data_dir, shiny_host = NULL, shiny_port = NULL) {
   inputId1 = c(
     'dx',
     'tx_type',
-    'donor',
-    'gvhdpr'
+    'HLA',
+    'gvhdpr',
+    'Prep',
+    'AB'
   )
   
   inputId2 = c(
     'RemSta',
-    'doncmv',
-    'aborh',
-    "Crd", "CVD", "DM", "HVD", "Hpm", "Hps", "Ifc", "IBD", "Obs", "Pep", "Psy", "Plm", "Pls", "Ren", "Rhe", "SoT"
+    'race',
+    'Gn',
+    'eth',
+    'Disease_x',
+    "aborh", "donor", "donGn", "donabo", "doncmv", "COD",
+    "ASXL1d", "BCORd", "BCORL1d", "BCRABLd", "CALRd", "CALR1d", "CALR2d", "CBLd",
+    "CEBPAd", "CSF3Rd", "CUX1d", "DNMT3Ad", "ETV6d", "EZH2d", "FLT3d", "FLT3TKDd",
+    "FLT3ITDd", "GATA2d", "IDH1d", "IDH2d", "JAK2d", "JAK2V617Fd", "JAK2exon12d",
+    "KITd", "KRASd", "MPLd", "NF1d", "NPM1d", "NRASd", "PHF6d", "PPM1Dd", "PTPN11d",
+    "P53d", "RUNX1d", "SETBP1d", "SF3B1d", "SRSF2d", "STAG2d", "TELAMLd", "TET2d",
+    "U2AF1d", "WT1d", "ZRSR2d"
   )
 
   input_choices1 = select_input_choices(inputId1, dict)
   input_choices2 = select_input_choices(inputId2, dict)
   
   # manually select variables to be included in the baseline table
-  tbl_variable_name = c('Age', 'Sex', 'Race', 'Diagnosis', 'Prep type', 'Donor type')
+  tbl_variable_name = c('Age', 'Sex', 'Race', 'Diagnosis', 'Donor type', 'HLA match', 'Conditioning regimen', 'Conditioning type')
   # generate format list(new_Age ~ 'Age',...) for gtsummary
   tbl_variable_list = setNames(as.list(tbl_variable_name), map_variable_name(tbl_variable_name))
   
@@ -55,9 +89,9 @@ shinyBMT <- function(data_dir, shiny_host = NULL, shiny_port = NULL) {
   # A selection of Cox-regression outcomes
   cox_selection = c('Please select...' = '', 'OS', 'RFS', 'GRFS', 'NRM', 'G2-4 aGvHD', 'G3-4 aGvHD')
   # A selection of Cox-regression covariates
-  cox_covariates_names = c('Group', 'Age (>=65)', 'Sex', 'Race', 'Diagnosis', 
-                           'Prep type', 'Donor type', 'Disease status', 'HCT-CI (>=3)')
-  
+  cox_covariates_names = c('Group', 'Age (>=65)', 'Diagnosis', 'HLA match',
+                           'Conditioning regimen', 'Conditioning type', 
+                           'Stem cell source', 'GVHD ppx', 'Donor type', 'HCT-CI (>=3)')
   
   ui <- fluidPage(
     tabsetPanel(
@@ -139,7 +173,7 @@ shinyBMT <- function(data_dir, shiny_host = NULL, shiny_port = NULL) {
                                   class = 'btn-primary')),
                  column(6, 
                         div(class = "well", style = "margin-top: 20px;",
-                            gt_output("baseline_chrcs")
+                            gt::gt_output("baseline_chrcs")
                         )
                  )
                )
@@ -155,7 +189,7 @@ shinyBMT <- function(data_dir, shiny_host = NULL, shiny_port = NULL) {
                ),
                mainPanel(
                  plotOutput("KM_curves"),
-                 gt_output("summary_table"))
+                 gt::gt_output("summary_table"))
       ),
       tabPanel("Cox Regression",
                sidebarPanel(
@@ -176,13 +210,27 @@ shinyBMT <- function(data_dir, shiny_host = NULL, shiny_port = NULL) {
                               selected = "multivariable"),
                  actionButton("run_cox", "Run Cox Regression", class='btn-primary')
                ),
-               column(6, gt_output("cox_reg_results"))
+               column(6, gt::gt_output("cox_reg_results"))
       )
       
     )
   )
   
   server <- function(input, output, session) {
+    
+    #### shiny manager part ####
+    # check_credentials directly on sqlite db
+    res_auth <- secure_server(
+      check_credentials = check_credentials(
+        "/workspace/jason_workspace/shinybmt_data/credentials.sqlite",
+        passphrase = key_get("R-shinymanager-key", "obiwankenobi")
+      ),
+      validate_pwd = function(pwd) nchar(pwd) > 0
+    )
+    
+    output$auth_output <- renderPrint({
+      reactiveValuesToList(res_auth)
+    })
     
     ########## for baseline-analysis tab ##########
     # synchronize selections between two groups
@@ -532,6 +580,27 @@ shinyBMT <- function(data_dir, shiny_host = NULL, shiny_port = NULL) {
     })
   }
   
+  set_labels(
+    language = "en",
+    "Please authenticate" = ""   # empty string hides it
+  )
+  
+  ui <- secure_app(ui, enable_admin = TRUE,
+                   # Top of the login card (logo, title, tagline)
+                   tags_top = div(
+                     style = "text-align:center;margin-bottom:1rem;",
+                     img(src = "static/logo.png", height = 96),              # put logo.png in ./www/
+                     h3("BMT Database Portal"),
+                     p(class = "text-muted", "Last data update 6/2025")
+                   ),
+                   # Bottom of the login card (footer/disclaimer)
+                   tags_bottom = div(
+                     style="text-align:center;color:#999;font-size:12px;margin-top:0.5rem;",
+                     HTML("&copy; "), format(Sys.Date(), "%Y"), " OSU BMT/Cell Therapy · Internal use only",
+                     HTML("<br>For questions or access please contact Jason (jiasheng.wang@osumc.edu)")
+                    )
+                   )
+
   shinyApp(ui = ui, server = server)
   
 }

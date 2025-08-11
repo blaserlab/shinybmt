@@ -90,8 +90,8 @@
 
 
 get_dict = function (dir) {
-  dict = read_excel(fs::path(dir, "joe_data_dict.xlsx"))
-  
+  dict = read_excel(fs::path(dir, "dict.xlsx"))
+   
   dict$attributes_name = strsplit(dict$attributes_name, ", ")
   
   dict$attributes_name = lapply(dict$attributes_name, function(x) gsub('"', '', x))

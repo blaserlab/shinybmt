@@ -175,7 +175,7 @@ ci_from_hct = function(subset_data, ci_status, ci_time, surv_status, surv_time,
 }
 
 
-# survival summary table function for NRM
+# survival summary table function
 #' @import survival
 #' @import dplyr
 #' @import gt
@@ -221,7 +221,7 @@ ci_table_from_hct = function(subset_data, ci_status, ci_time, surv_status, surv_
   if (ci_type %in% c('G2-4 aGvHD', 'G3-4 aGvHD')) {
     cum_table = tbl_cuminc( #tbl_cuminc function from tidycmprsk
       ci_model,
-      times = c(60, 100, 150),
+      times = c(60, 100, 180),
       label_header = "**{time}-day aGvHD, %(95%CI)**"
     ) %>%
       modify_header(label ~ "**Group**")
