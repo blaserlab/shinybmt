@@ -602,7 +602,7 @@ shinyBMT <- function(data_dir, shiny_host = NULL, shiny_port = NULL) {
                    tags_bottom = div(
                      style="text-align:center;color:#999;font-size:12px;margin-top:0.5rem;",
                      HTML("&copy; "), format(Sys.Date(), "%Y"), " OSU BMT/Cell Therapy · Internal use only",
-                     HTML("<br>For questions or access please contact Jason (jiasheng.wang@osumc.edu)")
+                     HTML("<br>For questions or access please contact Jason (jiasheng.wang@osumc.edu) or Brad (bradley.blaser@osumc.edu")
                     )
                    )
 
