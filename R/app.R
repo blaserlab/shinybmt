@@ -34,9 +34,14 @@
 #library(keyring)
 
 
-app_dir <- "/workspace/jason_workspace/shinybmt"
-www_dir <- file.path(app_dir, "www")  
-shiny::addResourcePath("static", www_dir) 
+# app_dir <- "/workspace/jason_workspace/shinybmt"
+# www_dir <- file.path(app_dir, "www")  
+# shiny::addResourcePath("static", www_dir) 
+
+pkg_www <- system.file("app", "www", package = "shinybmt")
+if (nzchar(pkg_www) && dir.exists(pkg_www)) {
+  shiny::addResourcePath("static", pkg_www)
+}
 
 
 shinyBMT <- function(data_dir, shiny_host = NULL, shiny_port = NULL) {
